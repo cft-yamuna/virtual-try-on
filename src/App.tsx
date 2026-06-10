@@ -4,6 +4,7 @@ import { CameraCapture } from './components/CameraCapture';
 import { ClothingSelection } from './components/ClothingSelection';
 import { TryOnResult } from './components/TryOnResult';
 import { generateVirtualTryOn } from './services/geminiApi';
+import { uploadCapturedImage } from './services/supabase';
 import { clothingItems } from './data/clothing';
 import { AppState, ClothingItem } from './types';
 
@@ -26,6 +27,14 @@ function App() {
       currentStep: 'selection',
       userImage: imageData
     }));
+
+    void uploadCapturedImage(imageData)
+      .then(publicUrl => {
+        console.log('Captured image uploaded to:', publicUrl);
+      })
+      .catch(error => {
+        console.error('Failed to upload captured image:', error);
+      });
   };
 
   const handleClothingSelection = async (clothing: ClothingItem) => {
@@ -42,7 +51,7 @@ function App() {
       const resultImage = await generateVirtualTryOn({
         userImage: appState.userImage,
         clothingImage: clothing.imageUrl,
-        apiKey: 'AIzaSyDwsZ-_NmnEFnB9nn3a6qe8FHPVVSpEZSk'
+        mode: clothing.generationMode || 'tryOn'
       });
 
       setAppState(prev => ({

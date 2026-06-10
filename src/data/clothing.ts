@@ -24,5 +24,18 @@ export const clothingItems: ClothingItem[] = [
     name: 'Formal Blue Shirt',
     imageUrl: '/image3.png',
     category: 'Shirts'
+  },
+  {
+    id: '5',
+    name: 'Casual Outfit',
+    imageUrl: '/image4.jpg',
+    category: 'Outfits'
+  },
+  {
+    id: '6',
+    name: 'Face Swap',
+    imageUrl: '/image.png',
+    category: 'Face Swap',
+    generationMode: 'faceSwap'
   }
 ];

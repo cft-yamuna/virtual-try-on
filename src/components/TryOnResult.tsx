@@ -1,5 +1,4 @@
 import React from 'react';
-import { RotateCcw } from 'lucide-react';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 
 interface TryOnResultProps {

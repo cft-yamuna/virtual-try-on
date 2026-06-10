@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Shirt, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { ClothingItem } from '../types';
 
 interface ClothingSelectionProps {
@@ -12,18 +12,9 @@ interface ClothingSelectionProps {
 export const ClothingSelection: React.FC<ClothingSelectionProps> = ({
   userImage,
   clothingItems,
-  onSelectClothing,
-  onBack
+  onSelectClothing
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-
-  const nextSlide = () => {
-    setCurrentIndex((prev) => (prev + 1) % clothingItems.length);
-  };
-
-  const prevSlide = () => {
-    setCurrentIndex((prev) => (prev - 1 + clothingItems.length) % clothingItems.length);
-  };
 
   return (
     <div className="bg-yellow-400 p-4">
@@ -47,7 +38,7 @@ export const ClothingSelection: React.FC<ClothingSelectionProps> = ({
               <button
                 key={item.id}
                 onClick={() => setCurrentIndex(index)}
-                className={`flex-shrink-0 w-56 h-64 rounded-2xl overflow-hidden border-4 transition-all duration-300 ${
+                className={`relative flex-shrink-0 w-56 h-64 rounded-2xl overflow-hidden border-4 transition-all duration-300 ${
                   currentIndex === index
                     ? 'border-white shadow-2xl scale-110'
                     : 'border-white/30 hover:border-white/60'
@@ -58,6 +49,10 @@ export const ClothingSelection: React.FC<ClothingSelectionProps> = ({
                   alt={item.name}
                   className="w-full h-full object-cover"
                 />
+                <div className="absolute inset-x-0 bottom-0 bg-black/75 px-3 py-2 text-left">
+                  <div className="text-sm font-semibold text-white">{item.name}</div>
+                  <div className="text-xs text-white/75">{item.category}</div>
+                </div>
               </button>
             ))}
           </div>

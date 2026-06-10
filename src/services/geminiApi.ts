@@ -4,8 +4,11 @@ import { supabase } from './supabase'; // Make sure this path is correct
 export interface TryOnRequest {
   userImage: string;
   clothingImage: string;
-  apiKey: string;
+  mode?: 'tryOn' | 'faceSwap';
 }
+
+const GEMINI_MODEL = 'gemini-3.1-flash-image';
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 // No changes needed for this helper function, it looks good.
 const convertImageToBase64 = async (imageSource: string): Promise<{ mimeType: string; data: string }> => {
@@ -34,15 +37,38 @@ const convertImageToBase64 = async (imageSource: string): Promise<{ mimeType: st
 
 export const generateVirtualTryOn = async (request: TryOnRequest): Promise<string> => {
   try {
-    // Note: You may want to use a more recent model like 'gemini-1.5-flash-latest'
-    // if 'gemini-2.5-flash-image-preview' is not available.
-    const genAI = new GoogleGenerativeAI(request.apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-image-preview' }); 
+    if (!GEMINI_API_KEY) {
+      throw new Error('Missing VITE_GEMINI_API_KEY environment variable');
+    }
+
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
     const userImageBlob = await convertImageToBase64(request.userImage);
     const clothingImageBlob = await convertImageToBase64(request.clothingImage);
 
-    const prompt = `Generate a realistic image showing the person from the first image wearing the clothing item from the second image. Maintain the person's pose, body proportions, and facial features while seamlessly fitting the clothing item onto them. The result should look natural and photorealistic with proper lighting and shadows.`;
+    const prompt =
+      request.mode === 'faceSwap'
+        ? `Generate a realistic face swap using Image 1 as the user's face reference and Image 2 as the target image.
+
+Put the face and exact hair from Image 1 onto the person in Image 2. Preserve the target image from Image 2 as the source of truth for the body, clothing, pose, background, lighting direction, camera angle, and composition. Replace the face identity and hairstyle with the user's face and hair from Image 1. The user's hair is a locked identity feature: preserve the same hairline, forehead coverage, parting, length, volume, shape, texture, curls or straightness, flyaways, beard or facial hair if visible, and hair color exactly as shown in Image 1. Do not beautify, restyle, shorten, lengthen, smooth, add, remove, or reinterpret the user's hair. Only adjust lighting, perspective, and edge blending enough to make the exact same hair fit naturally into Image 2.
+
+Keep the target person's clothing, accessories, body shape, pose, and background from Image 2 unchanged unless tiny adjustments are needed to blend the user's face and exact hair realistically. The final head should look like the user from Image 1, including the same hairstyle and hair details, while fitting naturally onto the target image. Make the final output look like a premium, high-quality, realistic portrait.
+
+Negative Prompt:
+
+Do not change the target clothing, pose, body, background, accessories, or composition. Do not keep the target person's original hairstyle if it conflicts with the user's hair from Image 1. Do not invent a new hairstyle. Do not make the hair longer, shorter, thicker, thinner, neater, messier, straighter, curlier, darker, lighter, or more stylized than Image 1. Do not create a collage or side-by-side image. Avoid pasted-on face, mismatched skin tone, wrong hairstyle, wrong hairline, wrong hair color, changed hair length, warped facial features, blurry details, bad anatomy, extra faces, duplicated heads, distorted eyes, unrealistic shadows, or visible seams.`
+        : `Generate a realistic virtual try-on image using Image 1 as the person reference and Image 2 as the clothing reference.
+
+The person from Image 1 must be shown wearing the exact clothing item from Image 2. The clothing is the source of truth and must remain unchanged. Preserve all visible logos, sponsor marks, numbers, names, badges, patches, labels, seams, trims, collar details, sleeve details, patterns, stripes, typography, colors, gradients, and fabric details exactly as in Image 2. Do not add, remove, simplify, distort, or invent any clothing elements. Fit the garment naturally onto the person’s body with realistic folds, wrinkles, shadows, and depth so it looks physically worn, not pasted.
+
+The person may be enhanced to look more AI-generated, polished, and visually appealing. Improve the face, skin, lighting, and overall appearance while keeping the same general identity, pose, and body structure. Make the person look cleaner, sharper, more refined, and aesthetically elevated with smooth natural skin, balanced facial symmetry, flattering lighting, clear details, and a premium high-quality AI-generated portrait feel. You may enhance facial clarity, glow, hair neatness, and overall presentation, but keep the result believable and visually attractive.
+
+Final output should look like a premium high-quality AI-generated fashion try-on image, with the clothing preserved exactly and the person enhanced beautifully.
+
+Negative Prompt:
+
+Do not change the clothing design. Do not invent or modify logos, text, numbers, badges, sponsors, patches, colors, stripes, patterns, seams, trims, or typography. Do not distort the garment. Avoid blurry results, bad anatomy, fake fabric fit, incorrect perspective, pasted-on clothing, extra limbs, deformed hands, low detail, or unrealistic shadows.`;
 
     const result = await model.generateContent([
       { text: prompt },

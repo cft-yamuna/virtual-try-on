@@ -8,11 +8,35 @@ interface CameraCaptureProps {
 export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const countdownTimerRef = useRef<number | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    setIsStreaming(false);
+  }, []);
 
   const startCamera = useCallback(async () => {
     try {
+      if (streamRef.current?.getVideoTracks().some(track => track.readyState === 'live')) {
+        if (videoRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+        }
+        setIsStreaming(true);
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: 1920,
@@ -21,10 +45,13 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture }) => {
         }
       });
 
+      streamRef.current = stream;
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        setIsStreaming(true);
       }
+
+      setIsStreaming(true);
     } catch (err) {
       console.error('Error accessing camera:', err);
       alert('Unable to access camera. Please ensure camera permissions are granted.');
@@ -32,8 +59,19 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture }) => {
   }, []);
 
   useEffect(() => {
-    startCamera();
-  }, [startCamera]);
+    if (!capturedImage) {
+      void startCamera();
+    }
+  }, [capturedImage, startCamera]);
+
+  useEffect(() => {
+    return () => {
+      if (countdownTimerRef.current) {
+        window.clearInterval(countdownTimerRef.current);
+      }
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   const captureImage = useCallback(() => {
     if (videoRef.current && canvasRef.current) {
@@ -86,18 +124,39 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture }) => {
 
   const retakePhoto = useCallback(() => {
     setCapturedImage(null);
+    setCountdown(null);
   }, []);
+
+  const startCaptureCountdown = useCallback(() => {
+    if (!isStreaming || countdown !== null) return;
+
+    setCountdown(3);
+
+    countdownTimerRef.current = window.setInterval(() => {
+      setCountdown(current => {
+        if (current === null) return null;
+
+        if (current <= 1) {
+          if (countdownTimerRef.current) {
+            window.clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+          }
+
+          captureImage();
+          return null;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+  }, [captureImage, countdown, isStreaming]);
 
   const confirmPhoto = useCallback(() => {
     if (capturedImage) {
       onCapture(capturedImage);
-      // Stop camera stream
-      if (videoRef.current?.srcObject) {
-        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-        tracks.forEach(track => track.stop());
-      }
+      stopCamera();
     }
-  }, [capturedImage, onCapture]);
+  }, [capturedImage, onCapture, stopCamera]);
 
   return (
     <div className="fixed inset-0 bg-yellow-400 p-[50px]">
@@ -113,10 +172,20 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture }) => {
             />
             <canvas ref={canvasRef} className="hidden" />
 
+            {countdown !== null && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                <div className="text-white text-8xl font-bold drop-shadow-lg tabular-nums">
+                  {countdown}
+                </div>
+              </div>
+            )}
+
             <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
               <button
-                onClick={captureImage}
-                className="bg-black hover:bg-gray-800 text-white w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-lg"
+                onClick={startCaptureCountdown}
+                disabled={!isStreaming || countdown !== null}
+                className="bg-black hover:bg-gray-800 disabled:bg-gray-700 disabled:cursor-not-allowed text-white w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 disabled:hover:scale-100 shadow-lg"
+                aria-label="Capture photo"
               >
                 <Camera size={28} />
               </button>

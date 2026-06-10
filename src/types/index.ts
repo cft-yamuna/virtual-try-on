@@ -3,6 +3,7 @@ export interface ClothingItem {
   name: string;
   imageUrl: string;
   category: string;
+  generationMode?: 'tryOn' | 'faceSwap';
 }
 
 export interface AppState {
