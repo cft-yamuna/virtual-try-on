@@ -24,7 +24,7 @@ export const NameScreen: React.FC<NameScreenProps> = ({ onContinue }) => {
             onChange={event => setName(event.target.value)}
             placeholder="Enter Your Name / Nickname"
             aria-label="Enter your name"
-            className="absolute left-[11.271%] top-[38.768%] h-[7.372%] w-[77.479%] rounded-[18px] border-0 bg-white px-[5.2%] font-['Helvetica_Now_Display'] text-[clamp(18px,3.25vh,42px)] font-extrabold leading-none text-[#1f1f1f] shadow-none outline-none placeholder:text-[#858585] focus:ring-4 focus:ring-white/40"
+            className="absolute left-[11.271%] top-[38.768%] h-[7.372%] w-[77.479%] rounded-[18px] border-0 bg-white px-[5.2%] font-['Helvetica_Now_Display'] text-[clamp(24px,4vh,52px)] font-extrabold leading-none text-[#1f1f1f] shadow-none outline-none placeholder:text-[#858585] focus:ring-4 focus:ring-white/40"
           />
 
           <button
