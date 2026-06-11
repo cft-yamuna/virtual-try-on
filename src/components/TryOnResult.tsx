@@ -54,8 +54,8 @@ const drawUserName = (context: CanvasRenderingContext2D, canvasWidth: number, ca
   const displayName = userName.trim();
   if (!displayName) return;
 
-  const maxWidth = canvasWidth * 0.62;
-  let fontSize = 34;
+  const maxWidth = canvasWidth * 0.72;
+  let fontSize = 96;
 
   context.fillStyle = '#ED2024';
   context.textAlign = 'left';
@@ -63,9 +63,9 @@ const drawUserName = (context: CanvasRenderingContext2D, canvasWidth: number, ca
 
   do {
     context.font = `800 ${fontSize}px "Helvetica Now Display", Arial, sans-serif`;
-    if (context.measureText(displayName).width <= maxWidth || fontSize <= 20) break;
+    if (context.measureText(displayName).width <= maxWidth || fontSize <= 48) break;
     fontSize -= 2;
-  } while (fontSize > 20);
+  } while (fontSize > 48);
 
   context.fillText(displayName, canvasWidth * 0.05, canvasHeight * 0.955);
 };
@@ -298,6 +298,7 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
   const [framedResultImage, setFramedResultImage] = useState('');
   const [isPreparingQr, setIsPreparingQr] = useState(false);
   const [printMode, setPrintMode] = useState<'front' | 'back'>('front');
+  const [hasPrintedFront, setHasPrintedFront] = useState(false);
 
   const createFramedResultImage = useCallback(async () => {
     await loadPosterFont();
@@ -379,6 +380,23 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     if (!resultImage || !processedResultImage || !framedResultImage || isPreparingQr) return;
 
     await printSelectedSide('front');
+    setHasPrintedFront(true);
+  };
+
+  const handleNext = async () => {
+    if (!resultImage || !processedResultImage || !framedResultImage || isPreparingQr) return;
+
+    setIsPreparingQr(true);
+
+    try {
+      const sharedResultUrl = await uploadSharedResultImage(framedResultImage);
+      onShowQr(sharedResultUrl);
+    } catch (error) {
+      console.error('Failed to upload shared result image:', error);
+      onShowQr(processedResultImage || resultImage);
+    } finally {
+      setIsPreparingQr(false);
+    }
   };
 
   const handlePrintBackAndContinue = async () => {
@@ -406,8 +424,11 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     if (!resultImage) {
       setProcessedResultImage('');
       setFramedResultImage('');
+      setHasPrintedFront(false);
       return;
     }
+
+    setHasPrintedFront(false);
 
     let cancelled = false;
     const image = new Image();
@@ -532,24 +553,32 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
 
         <button
           type="button"
-          onClick={handlePrint}
-          disabled={!resultImage || !processedResultImage || isPreparingQr}
-          className="no-print absolute left-[32.549%] top-[89.389%] z-30 h-[6.771%] w-[36.204%] overflow-hidden rounded-[122px] transition-transform duration-300 hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
-          aria-label="Print result"
+          onClick={hasPrintedFront ? handleNext : handlePrint}
+          disabled={!resultImage || !processedResultImage || !framedResultImage || isPreparingQr}
+          className={`no-print absolute left-[32.549%] top-[89.389%] z-30 h-[6.771%] w-[36.204%] overflow-hidden rounded-[122px] transition-transform duration-300 hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100 ${
+            hasPrintedFront
+              ? "bg-[#ffd914] text-black font-['Helvetica_Now_Display'] text-[clamp(20px,4vh,54px)] font-extrabold leading-none"
+              : ''
+          }`}
+          aria-label={hasPrintedFront ? 'Next' : 'Print result'}
         >
-          <img
-            src="/print_bt.png"
-            alt="Print"
-            className="block h-full w-full"
-            draggable={false}
-          />
+          {hasPrintedFront ? (
+            <span className="flex h-full w-full items-center justify-center">NEXT</span>
+          ) : (
+            <img
+              src="/print_bt.png"
+              alt="Print"
+              className="block h-full w-full"
+              draggable={false}
+            />
+          )}
         </button>
 
         <button
           type="button"
           onClick={handlePrintBackAndContinue}
           disabled={!resultImage || !processedResultImage || !framedResultImage || isPreparingQr}
-          className="no-print absolute right-[6%] top-[89.389%] z-30 flex h-[6.771%] aspect-square items-center justify-center rounded-full bg-white text-black shadow-xl transition-transform duration-300 hover:scale-105 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
+          className="no-print absolute bottom-[1.5%] right-[1.5%] z-30 flex h-[4%] aspect-square items-center justify-center rounded-full bg-white text-black opacity-0 transition-opacity focus:opacity-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80 disabled:cursor-not-allowed"
           aria-label="Print back and continue"
           title="Print back and continue"
         >

@@ -200,7 +200,7 @@ function App() {
       );
 
     case 'qr':
-      return <QrScreen value={appState.qrValue || appState.resultImage || window.location.href} />;
+      return <QrScreen value={appState.qrValue || appState.resultImage || window.location.href} onRestart={handleStartOver} />;
     
     default:
       return <CameraCapture onCapture={handleImageCapture} />;

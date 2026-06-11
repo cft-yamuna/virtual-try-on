@@ -202,7 +202,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture }) => {
           </>
         ) : (
           <>
-            <div className="absolute left-[8.056%] top-[21.771%] h-[59.635%] w-[82.963%] overflow-hidden bg-black">
+            <div className="absolute left-[12%] top-[31%] h-[46%] w-[76%] overflow-hidden bg-black">
               <img
                 src={capturedImage}
                 alt="Captured"
