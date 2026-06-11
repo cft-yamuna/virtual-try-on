@@ -9,6 +9,7 @@ interface TryOnResultProps {
   isLoading: boolean;
   userName: string;
   onStartOver: () => void;
+  onSharedResultCreated: (sharedResultUrl: string) => void;
   onShowQr: (value: string) => void;
 }
 
@@ -283,11 +284,10 @@ const removeGeneratedBackground = (imageData: ImageData) => {
 };
 
 export const TryOnResult: React.FC<TryOnResultProps> = ({
-  userImage,
-  selectedClothing,
   resultImage,
   isLoading,
   userName,
+  onSharedResultCreated,
   onShowQr
 }) => {
   const [processedResultImage, setProcessedResultImage] = useState('');
@@ -384,6 +384,7 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
 
     try {
       const sharedResultUrl = await uploadSharedResultImage(framedResultImage);
+      onSharedResultCreated(sharedResultUrl);
       onShowQr(sharedResultUrl);
     } catch (error) {
       console.error('Failed to upload shared result image:', error);
@@ -401,6 +402,7 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
 
     try {
       sharedResultUrl = await uploadSharedResultImage(framedResultImage);
+      onSharedResultCreated(sharedResultUrl);
     } catch (error) {
       console.error('Failed to create shared result image:', error);
       sharedResultUrl = processedResultImage || resultImage;
@@ -499,19 +501,20 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     return (
       <div className="min-h-screen bg-black flex items-center justify-center overflow-hidden">
         <main className="relative h-screen max-h-[calc(100vw*16/9)] w-screen max-w-[calc(100vh*9/16)] bg-[url('/bg6.png')] bg-cover bg-center flex items-center justify-center">
-          <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white/20 text-center max-w-md">
-            <div className="mb-6">
-              <div className="w-16 h-16 mx-auto mb-4 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-              <h2 className="text-2xl font-bold text-white mb-2">Processing ...</h2>
+          <div className="flex w-[76%] flex-col items-center justify-center">
+            <h2 className="loading-title font-['Helvetica_Now_Display'] text-[clamp(28px,4.8vh,58px)] font-extrabold text-white">
+              Creating Your Look
+              <span className="loading-dot">.</span>
+              <span className="loading-dot">.</span>
+              <span className="loading-dot">.</span>
+            </h2>
+            <div className="loading-track mt-9 h-[10px] w-full max-w-[420px] overflow-hidden rounded-full bg-white/20">
+              <div className="loading-scan h-full rounded-full bg-[#ffd914]" />
             </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="aspect-square rounded-xl overflow-hidden">
-                <img src={userImage} alt="Original" className="w-full h-full object-cover" />
-              </div>
-              <div className="aspect-square rounded-xl overflow-hidden">
-                <img src={selectedClothing} alt="Clothing" className="w-full h-full object-cover" />
-              </div>
+            <div className="mt-6 flex items-center gap-3" aria-hidden="true">
+              <span className="loading-pulse h-3 w-3 rounded-full bg-white" />
+              <span className="loading-pulse h-3 w-3 rounded-full bg-[#ffd914]" />
+              <span className="loading-pulse h-3 w-3 rounded-full bg-white" />
             </div>
           </div>
         </main>

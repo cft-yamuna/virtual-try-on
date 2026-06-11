@@ -50,3 +50,51 @@ export const uploadSharedResultImage = async (imageData: string): Promise<string
 
   return urlData.publicUrl;
 };
+
+interface CreateTryOnSessionInput {
+  userName: string;
+  gender: 'male' | 'female' | null;
+  selectedJersey: 'j1' | 'j2' | null;
+  capturedImageUrl: string | null;
+  resultImageUrl: string;
+}
+
+export const createTryOnSession = async ({
+  userName,
+  gender,
+  selectedJersey,
+  capturedImageUrl,
+  resultImageUrl
+}: CreateTryOnSessionInput): Promise<string> => {
+  const { data, error } = await supabase
+    .from('try_on_sessions')
+    .insert({
+      user_name: userName,
+      gender,
+      selected_jersey: selectedJersey,
+      captured_image_url: capturedImageUrl,
+      result_image_url: resultImageUrl
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data.id;
+};
+
+export const updateTryOnSessionSharedResult = async (
+  sessionId: string,
+  sharedResultUrl: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('try_on_sessions')
+    .update({ shared_result_url: sharedResultUrl })
+    .eq('id', sessionId);
+
+  if (error) {
+    throw error;
+  }
+};

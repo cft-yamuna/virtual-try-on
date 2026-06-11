@@ -7,7 +7,11 @@ import { CameraCapture } from './components/CameraCapture';
 import { TryOnResult } from './components/TryOnResult';
 import { QrScreen } from './components/QrScreen';
 import { generateVirtualTryOn } from './services/geminiApi';
-import { uploadCapturedImage } from './services/supabase';
+import {
+  createTryOnSession,
+  updateTryOnSessionSharedResult,
+  uploadCapturedImage
+} from './services/supabase';
 import { AppState } from './types';
 
 const jerseyGeneration = {
@@ -68,6 +72,7 @@ function App() {
     userImage: null,
     selectedClothing: null,
     resultImage: null,
+    tryOnSessionId: null,
     qrValue: null,
     isLoading: false
   });
@@ -111,16 +116,16 @@ function App() {
       userImage: imageData,
       selectedClothing,
       resultImage: null,
+      tryOnSessionId: null,
       qrValue: null,
       isLoading: true
     }));
 
-    void uploadCapturedImage(imageData)
-      .then(publicUrl => {
-        console.log('Captured image uploaded to:', publicUrl);
-      })
-      .catch(error => {
+    const capturedImageUpload = uploadCapturedImage(imageData)
+      .then(publicUrl => publicUrl)
+      .catch((error): null => {
         console.error('Failed to upload captured image:', error);
+        return null;
       });
 
     try {
@@ -132,10 +137,23 @@ function App() {
         poseImage: selectedClothing.poseImageUrl,
         promptVariant: selectedClothing.promptVariant
       });
+      const capturedImageUrl = await capturedImageUpload;
+
+      const tryOnSessionId = await createTryOnSession({
+        userName: appState.userName,
+        gender: selectedGender,
+        selectedJersey,
+        capturedImageUrl,
+        resultImageUrl: resultImage
+      }).catch((error): null => {
+        console.error('Failed to save try-on session:', error);
+        return null;
+      });
 
       setAppState(prev => ({
         ...prev,
         resultImage,
+        tryOnSessionId,
         isLoading: false
       }));
     } catch (error) {
@@ -157,9 +175,19 @@ function App() {
       userImage: null,
       selectedClothing: null,
       resultImage: null,
+      tryOnSessionId: null,
       qrValue: null,
       isLoading: false
     });
+  };
+
+  const handleSharedResultCreated = (sharedResultUrl: string) => {
+    if (!appState.tryOnSessionId) return;
+
+    void updateTryOnSessionSharedResult(appState.tryOnSessionId, sharedResultUrl)
+      .catch(error => {
+        console.error('Failed to update try-on shared result:', error);
+      });
   };
 
   const handleShowQr = (qrValue: string) => {
@@ -195,6 +223,7 @@ function App() {
           isLoading={appState.isLoading}
           userName={appState.userName}
           onStartOver={handleStartOver}
+          onSharedResultCreated={handleSharedResultCreated}
           onShowQr={handleShowQr}
         />
       );

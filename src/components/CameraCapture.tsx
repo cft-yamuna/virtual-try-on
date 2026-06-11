@@ -202,6 +202,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture }) => {
           </>
         ) : (
           <>
+            <h2 className="absolute left-[8%] top-[21.5%] w-[84%] text-center font-['Helvetica_Now_Display'] text-[clamp(26px,4.6vh,56px)] font-extrabold leading-none text-white">
+              Ready to Submit?
+            </h2>
+
             <div className="absolute left-[12%] top-[31%] h-[46%] w-[76%] overflow-hidden bg-black">
               <img
                 src={capturedImage}

@@ -17,6 +17,7 @@ export interface AppState {
   userImage: string | null;
   selectedClothing: ClothingItem | null;
   resultImage: string | null;
+  tryOnSessionId: string | null;
   qrValue: string | null;
   isLoading: boolean;
 }
