@@ -562,10 +562,10 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
           type="button"
           onClick={handleNext}
           disabled={!resultImage || !processedResultImage || !framedResultImage || isPreparingQr}
-          className="no-print absolute right-[14%] top-[89.389%] z-30 h-[6.771%] w-[33%] overflow-hidden rounded-[122px] bg-[#ffd914] text-black font-['Helvetica_Now_Display'] text-[clamp(20px,4vh,54px)] font-extrabold leading-none transition-transform duration-300 hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
+          className="no-print absolute right-[14%] top-[89.389%] z-30 h-[6.771%] w-[33%] overflow-hidden rounded-[122px] bg-[#ffd914] text-black font-['Helvetica_Now_Display'] text-[clamp(18px,3.4vh,46px)] font-extrabold leading-none transition-transform duration-300 hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
           aria-label="Next"
         >
-          <span className="flex h-full w-full items-center justify-center">NEXT</span>
+          <span className="flex h-full w-full items-center justify-center">Next</span>
         </button>
 
         <button
