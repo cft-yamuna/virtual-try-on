@@ -24,10 +24,11 @@ const jerseyGeneration = {
     j2: {
       id: 'try-on-j2',
       name: 'Blue Jersey',
-      imageUrl: '/male_j2.png',
+      imageUrl: '/jj2.png',
       category: 'Jersey',
       generationMode: 'tryOn' as const,
-      composition: 'closePortrait' as const
+      poseImageUrl: '/male_j2.png',
+      promptVariant: 'maleJ2ThreeReference' as const
     }
   },
   female: {
@@ -42,9 +43,10 @@ const jerseyGeneration = {
     j2: {
       id: 'try-on-female-j2',
       name: 'Female Jersey 2',
-      imageUrl: '/fmale2.png',
+      imageUrl: '/jj2.png',
       category: 'Jersey',
-      generationMode: 'tryOn' as const
+      generationMode: 'tryOn' as const,
+      promptVariant: 'femaleJ2ThreeReference' as const
     }
   }
 };

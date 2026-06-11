@@ -7,7 +7,7 @@ export interface TryOnRequest {
   mode?: 'tryOn' | 'faceSwap';
   composition?: 'closePortrait';
   poseImage?: string;
-  promptVariant?: 'maleJ1ThreeReference' | 'femaleJ1ThreeReference';
+  promptVariant?: 'maleJ1ThreeReference' | 'femaleJ1ThreeReference' | 'maleJ2ThreeReference' | 'femaleJ2ThreeReference';
 }
 
 const GEMINI_MODEL = 'gemini-3.1-flash-image';
@@ -50,7 +50,9 @@ export const generateVirtualTryOn = async (request: TryOnRequest): Promise<strin
     const userImageBlob = await convertImageToBase64(request.userImage);
     const clothingImageBlob = await convertImageToBase64(request.clothingImage);
     const poseImageBlob =
-      request.poseImage && request.promptVariant !== 'femaleJ1ThreeReference'
+      request.poseImage &&
+      request.promptVariant !== 'femaleJ1ThreeReference' &&
+      request.promptVariant !== 'femaleJ2ThreeReference'
         ? await convertImageToBase64(request.poseImage)
         : null;
 
@@ -77,6 +79,30 @@ If the background is not mentioned, or if any reference image includes a backgro
 
 Negative Prompt:
 Do not change the user's identity from Image 1. Do not change the jersey details from jog.png. Do not change the pose/composition from male_j2.png. Do not use any background except exactly #00FF00. Do not add gradients, shadows, or noise to the background. Do not produce a cartoon, illustration, stylized result, collage, or side-by-side image. Avoid bad anatomy, blurry face, deformed hands, extra limbs, unrealistic skin, changed jersey logos, changed jersey text, changed jersey colors, or wrong pose.`;
+
+    const maleJ2ThreeReferencePrompt = `You are given three reference images:
+
+Image 1: The captured photo of the person. Use this image as the identity reference. Preserve the person's face exactly as shown, including facial structure, skin tone, hairstyle, eyes, nose, lips, jawline, facial hair, and age. The final output must clearly look like the same person from Image 1.
+
+Image 2: jj2.png. This is the jersey reference image. Replace only the person's current clothing with the exact jersey shown in jj2.png. Preserve all jersey details exactly, including colors, patterns, textures, stitching, logos, badges, stars, text, collar shape, sleeve design, and placements. Do not redesign, simplify, or reinterpret the jersey.
+
+Image 3: The pose reference image male_j2.png. Use this image to determine the exact pose and composition. Match the head position, facial direction, body orientation, shoulder alignment, arm placement, camera angle, framing, crop, and overall composition as closely as possible.
+
+Generate a highly realistic DSLR-quality photograph with natural skin texture, realistic lighting, and realistic fabric folds.
+
+Priority order:
+1. Exact pose from male_j2.png.
+2. Exact face and identity from Image 1.
+3. Exact jersey reproduction from jj2.png.
+4. Background styling.
+
+The final image should look like a real photograph of the person from Image 1 wearing the exact jersey from jj2.png while posing exactly like Image 3.
+
+BACKGROUND:
+If the background is not mentioned, or if any reference image includes a background color other than green, replace it. Every single pixel outside the person must be exactly #00FF00. Use flat solid #00FF00 only. Do not use white, gray, black, lime, olive, yellow-green, gradients, shadows, vignettes, noise, or any background variation.
+
+Negative Prompt:
+Do not change the user's identity from Image 1. Do not change the jersey details from jj2.png. Do not change the pose/composition from male_j2.png. Do not use any background except exactly #00FF00. Do not add gradients, shadows, or noise to the background. Do not produce a cartoon, illustration, stylized result, collage, or side-by-side image. Avoid bad anatomy, blurry face, deformed hands, extra limbs, unrealistic skin, changed jersey logos, changed jersey text, changed jersey colors, or wrong pose.`;
 
     const femaleJ1ThreeReferencePrompt = `You are given two reference images:
 
@@ -106,6 +132,34 @@ If the background is not mentioned, or if any reference image includes a backgro
 Negative Prompt:
 Do not return fmale.png unchanged. Do not use fmale.png as a source image. Do not output any public/reference image directly. Do not copy a woman, face, hairstyle, body identity, clothing, jersey, colors, lighting, background, or pixels from fmale.png. Do not change the woman's identity from Image 1. Do not beautify, feminize further, or alter her appearance. Do not change the jersey details from jog.png. Do not use any background except exactly #00FF00. Do not add gradients, shadows, or noise to the background. Do not produce a cartoon, illustration, stylized result, collage, or side-by-side image. Avoid bad anatomy, blurry face, deformed hands, extra limbs, unrealistic skin, changed jersey logos, changed jersey text, changed jersey colors, or wrong pose.`;
 
+    const femaleJ2ThreeReferencePrompt = `You are given two reference images:
+
+Image 1: The captured photo of the woman. Use this image as the identity reference. Preserve her face exactly as shown, including facial structure, skin tone, hairstyle, eyes, eyebrows, nose, lips, jawline, and age. The final output must clearly look like the same woman from Image 1. Do not beautify, feminize further, or alter her appearance.
+
+Image 2: jj2.png. This is the jersey reference image. Replace only the woman's current clothing with the exact jersey shown in jj2.png. Preserve all jersey details exactly, including colors, patterns, textures, stitching, logos, badges, stars, text, collar shape, sleeve design, and placements. Do not redesign, simplify, or reinterpret the jersey. Ensure the jersey fits naturally on her body while maintaining the original design.
+
+POSE & COMPOSITION:
+Create a clean front-facing female football portrait. The woman should stand upright, centered, facing the camera directly with a neutral confident expression. Use a straight camera angle, natural shoulder alignment, relaxed arms, and a crop from the top of the head to around the thighs/upper legs so the jersey is clearly visible. Do not use or reproduce fmale.png. Do not copy any public/reference image directly.
+
+Generate a highly realistic DSLR-quality photograph with natural skin texture, realistic lighting, and realistic fabric folds.
+
+Priority order:
+1. Exact face and identity from Image 1.
+2. Exact jersey reproduction from jj2.png.
+3. Front-facing female portrait pose and composition.
+4. Background styling.
+
+The final image should look like a real photograph of the same woman from Image 1 wearing the exact jersey from jj2.png in a clean centered front-facing portrait.
+
+IMPORTANT:
+Generate a new final photograph. Do not return fmale.png, jj2.png, or the captured photo unchanged. The output must combine Image 1 identity + Image 2 jersey + the described front-facing portrait pose.
+
+BACKGROUND:
+If the background is not mentioned, or if any reference image includes a background color other than green, replace it. Every single pixel outside the person must be exactly #00FF00. Use flat solid #00FF00 only. Do not use white, gray, black, lime, olive, yellow-green, gradients, shadows, vignettes, noise, or any background variation.
+
+Negative Prompt:
+Do not return fmale.png unchanged. Do not use fmale.png as a source image. Do not output any public/reference image directly. Do not copy a woman, face, hairstyle, body identity, clothing, jersey, colors, lighting, background, or pixels from fmale.png. Do not change the woman's identity from Image 1. Do not beautify, feminize further, or alter her appearance. Do not change the jersey details from jj2.png. Do not use any background except exactly #00FF00. Do not add gradients, shadows, or noise to the background. Do not produce a cartoon, illustration, stylized result, collage, or side-by-side image. Avoid bad anatomy, blurry face, deformed hands, extra limbs, unrealistic skin, changed jersey logos, changed jersey text, changed jersey colors, or wrong pose.`;
+
     const compositionPrompt =
       request.composition === 'closePortrait'
         ? `
@@ -115,8 +169,12 @@ COMPOSITION OVERRIDE FOR THIS JERSEY - Create a close-up chest portrait like a p
     const prompt =
       request.promptVariant === 'maleJ1ThreeReference'
         ? maleJ1ThreeReferencePrompt
+        : request.promptVariant === 'maleJ2ThreeReference'
+          ? maleJ2ThreeReferencePrompt
         : request.promptVariant === 'femaleJ1ThreeReference'
           ? femaleJ1ThreeReferencePrompt
+          : request.promptVariant === 'femaleJ2ThreeReference'
+            ? femaleJ2ThreeReferencePrompt
           : `Generate a realistic face swap using Image 1 as the user's face reference and Image 2 as the target image.
 
 IDENTITY LOCK - Image 1 is the absolute source of truth for the user's face identity. Extract and transplant the following features with zero modification: eye shape, eye color, iris pattern, eyelid fold, eyebrow shape and thickness, nose bridge width, nose tip shape, nostril shape, lip thickness and shape, cupid's bow, philtrum, cheek structure, jawline geometry, chin shape, forehead height, hairline shape, hair color, hair texture, hair parting, hair volume, hair length, and all skin details including tone, undertone, pores, marks, moles, scars, and natural asymmetry. If the user wears glasses in Image 1, preserve the glasses on the swapped face. If the user is clean-shaven in Image 1, the output must also be clean-shaven - no stubble, no beard, no mustache, no sideburns added under any circumstance.

@@ -276,7 +276,7 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     const targetWidth = Math.min(933, canvas.width);
     const targetHeight = Math.min(1065, canvas.height);
     const targetLeft = (canvas.width - targetWidth) / 2;
-    const targetTop = canvas.height * 0.18 + (canvas.height * 0.7 - targetHeight) / 2;
+    const targetTop = canvas.height * 0.18 + (canvas.height * 0.7 - targetHeight) / 2 - canvas.height * 0.055;
     const imageRatio = sourceWidth / sourceHeight;
     const targetRatio = targetWidth / targetHeight;
 
