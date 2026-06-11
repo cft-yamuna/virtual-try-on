@@ -91,7 +91,10 @@ export const updateTryOnSessionSharedResult = async (
 ): Promise<void> => {
   const { error } = await supabase
     .from('try_on_sessions')
-    .update({ shared_result_url: sharedResultUrl })
+    .update({
+      result_image_url: sharedResultUrl,
+      shared_result_url: sharedResultUrl
+    })
     .eq('id', sessionId);
 
   if (error) {

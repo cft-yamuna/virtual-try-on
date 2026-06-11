@@ -29,20 +29,7 @@ before update on public.try_on_sessions
 for each row
 execute function public.set_updated_at();
 
-alter table public.try_on_sessions enable row level security;
-
 drop policy if exists "Allow public try-on session inserts" on public.try_on_sessions;
 drop policy if exists "Allow public try-on session shared result updates" on public.try_on_sessions;
 
-create policy "Allow public try-on session inserts"
-on public.try_on_sessions
-for insert
-to anon
-with check (true);
-
-create policy "Allow public try-on session shared result updates"
-on public.try_on_sessions
-for update
-to anon
-using (true)
-with check (true);
+alter table public.try_on_sessions disable row level security;
