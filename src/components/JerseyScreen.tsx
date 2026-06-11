@@ -1,33 +1,54 @@
 import React, { useState } from 'react';
 
+type Gender = 'male' | 'female';
 type Jersey = 'j1' | 'j2';
 
 interface JerseyScreenProps {
+  gender: Gender | null;
   onContinue: (jersey: Jersey) => void;
 }
 
-const jerseyOptions: Array<{
+type JerseyOption = {
   value: Jersey;
   label: string;
   image: string;
   className: string;
-}> = [
-  {
-    value: 'j1',
-    label: 'Jersey 1',
-    image: '/j1.png',
-    className: 'left-[12.081%]'
-  },
-  {
-    value: 'j2',
-    label: 'Jersey 2',
-    image: '/j2.png',
-    className: 'left-[51.806%]'
-  }
-];
+};
 
-export const JerseyScreen: React.FC<JerseyScreenProps> = ({ onContinue }) => {
+const jerseyOptionsByGender: Record<Gender, JerseyOption[]> = {
+  male: [
+    {
+      value: 'j1',
+      label: 'Jersey 1',
+      image: '/j1.png',
+      className: 'left-[12.081%]'
+    },
+    {
+      value: 'j2',
+      label: 'Jersey 2',
+      image: '/j2.png',
+      className: 'left-[51.806%]'
+    }
+  ],
+  female: [
+    {
+      value: 'j1',
+      label: 'Jersey 1',
+      image: '/fmale.png',
+      className: 'left-[12.081%]'
+    },
+    {
+      value: 'j2',
+      label: 'Jersey 2',
+      image: '/female.png',
+      className: 'left-[51.806%]'
+    }
+  ]
+};
+
+export const JerseyScreen: React.FC<JerseyScreenProps> = ({ gender, onContinue }) => {
   const [selectedJersey, setSelectedJersey] = useState<Jersey>('j1');
+  const jerseyOptions = jerseyOptionsByGender[gender || 'male'];
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

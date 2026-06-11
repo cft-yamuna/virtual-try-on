@@ -19,38 +19,28 @@ const jerseyGeneration = {
     j1: {
       id: 'try-on-j1',
       name: 'Jersey 1',
-      imageUrl: '/jog.png',
-      category: 'Jersey',
-      generationMode: 'tryOn' as const,
-      poseImageUrl: '/male_j2.png',
-      promptVariant: 'maleJ1ThreeReference' as const
+      imageUrl: '/male1.jpg',
+      category: 'Jersey'
     },
     j2: {
       id: 'try-on-j2',
       name: 'Blue Jersey',
-      imageUrl: '/jj2.png',
-      category: 'Jersey',
-      generationMode: 'tryOn' as const,
-      poseImageUrl: '/male_j2.png',
-      promptVariant: 'maleJ2ThreeReference' as const
+      imageUrl: '/male2.jpg',
+      category: 'Jersey'
     }
   },
   female: {
     j1: {
       id: 'try-on-female-j1',
       name: 'Female Jersey 1',
-      imageUrl: '/jog.png',
-      category: 'Jersey',
-      generationMode: 'tryOn' as const,
-      promptVariant: 'femaleJ1ThreeReference' as const
+      imageUrl: '/female1.png',
+      category: 'Jersey'
     },
     j2: {
       id: 'try-on-female-j2',
       name: 'Female Jersey 2',
-      imageUrl: '/jj2.png',
-      category: 'Jersey',
-      generationMode: 'tryOn' as const,
-      promptVariant: 'femaleJ2ThreeReference' as const
+      imageUrl: '/female2.jpg',
+      category: 'Jersey'
     }
   }
 };
@@ -58,9 +48,8 @@ const jerseyGeneration = {
 const fallbackGeneration = {
   id: 'try-on-j1',
   name: 'Jersey 1',
-  imageUrl: '/image.png',
-  category: 'Jersey',
-  generationMode: 'tryOn' as const
+  imageUrl: '/male1.jpg',
+  category: 'Jersey'
 };
 
 function App() {
@@ -131,11 +120,7 @@ function App() {
     try {
       const resultImage = await generateVirtualTryOn({
         userImage: imageData,
-        clothingImage: selectedClothing.imageUrl,
-        mode: selectedClothing.generationMode,
-        composition: selectedClothing.composition,
-        poseImage: selectedClothing.poseImageUrl,
-        promptVariant: selectedClothing.promptVariant
+        clothingImage: selectedClothing.imageUrl
       });
       const capturedImageUrl = await capturedImageUpload;
 
@@ -209,7 +194,7 @@ function App() {
       return <GenderScreen onContinue={handleGenderContinue} />;
 
     case 'jersey':
-      return <JerseyScreen onContinue={handleJerseyContinue} />;
+      return <JerseyScreen gender={appState.gender} onContinue={handleJerseyContinue} />;
 
     case 'capture':
       return <CameraCapture onCapture={handleImageCapture} />;

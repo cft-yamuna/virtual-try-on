@@ -4,9 +4,6 @@ export interface ClothingItem {
   imageUrl: string;
   category: string;
   generationMode?: 'tryOn' | 'faceSwap';
-  composition?: 'closePortrait';
-  poseImageUrl?: string;
-  promptVariant?: 'maleJ1ThreeReference' | 'femaleJ1ThreeReference' | 'maleJ2ThreeReference' | 'femaleJ2ThreeReference';
 }
 
 export interface AppState {
