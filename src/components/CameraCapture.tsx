@@ -1,5 +1,4 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
-import { Camera, RotateCcw, CheckCircle } from 'lucide-react';
 
 interface CameraCaptureProps {
   onCapture: (imageData: string) => void;
@@ -159,41 +158,51 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture }) => {
   }, [capturedImage, onCapture, stopCamera]);
 
   return (
-    <div className="fixed inset-0 bg-yellow-400 p-[50px]">
-      <div className="w-full h-full relative">
+    <div className="min-h-screen bg-black flex items-center justify-center overflow-hidden">
+      <main
+        className={`relative h-screen max-h-[calc(100vw*16/9)] w-screen max-w-[calc(100vh*9/16)] bg-cover bg-center ${
+          capturedImage ? "bg-[url('/bg5.png')]" : "bg-[url('/bg4.png')]"
+        }`}
+        aria-label="Capture your photo"
+      >
         {!capturedImage ? (
-          <div className="relative w-full h-full  overflow-hidden">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover"
-            />
-            <canvas ref={canvasRef} className="hidden" />
+          <>
+            <div className="absolute left-[8.056%] top-[21.771%] h-[59.635%] w-[82.963%] overflow-hidden bg-black">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+              <canvas ref={canvasRef} className="hidden" />
 
-            {countdown !== null && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                <div className="text-white text-8xl font-bold drop-shadow-lg tabular-nums">
-                  {countdown}
+              {countdown !== null && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                  <div className="text-white text-8xl font-bold drop-shadow-lg tabular-nums">
+                    {countdown}
+                  </div>
                 </div>
-              </div>
-            )}
-
-            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
-              <button
-                onClick={startCaptureCountdown}
-                disabled={!isStreaming || countdown !== null}
-                className="bg-black hover:bg-gray-800 disabled:bg-gray-700 disabled:cursor-not-allowed text-white w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 disabled:hover:scale-100 shadow-lg"
-                aria-label="Capture photo"
-              >
-                <Camera size={28} />
-              </button>
+              )}
             </div>
-          </div>
+
+            <button
+              onClick={startCaptureCountdown}
+              disabled={!isStreaming || countdown !== null}
+              className="absolute left-[11.574%] top-[86.406%] h-[7.372%] w-[77.479%] overflow-hidden rounded-[120px] transition-transform duration-300 hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80"
+              aria-label="Capture photo"
+            >
+              <img
+                src="/capture_bt.png"
+                alt="Capture"
+                className="block h-full w-full"
+                draggable={false}
+              />
+            </button>
+          </>
         ) : (
-          <div className="w-full h-full flex flex-col">
-            <div className="flex-1 rounded-2xl overflow-hidden mb-6">
+          <>
+            <div className="absolute left-[8.056%] top-[21.771%] h-[59.635%] w-[82.963%] overflow-hidden bg-black">
               <img
                 src={capturedImage}
                 alt="Captured"
@@ -201,25 +210,34 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture }) => {
               />
             </div>
 
-            <div className="flex gap-4 px-8 pb-8">
-              <button
-                onClick={retakePhoto}
-                className="flex-1 bg-black hover:bg-gray-800 text-white py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all duration-300"
-              >
-                <RotateCcw size={20} />
-                Retake
-              </button>
-              <button
-                onClick={confirmPhoto}
-                className="flex-1 bg-black hover:bg-gray-800 text-white py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 hover:scale-105"
-              >
-                <CheckCircle size={20} />
-                Continue
-              </button>
-            </div>
-          </div>
+            <button
+              onClick={retakePhoto}
+              className="absolute left-[8.056%] top-[85.417%] h-[6.771%] w-[36.204%] overflow-hidden rounded-[122px] transition-transform duration-300 hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80"
+              aria-label="Retake photo"
+            >
+              <img
+                src="/retake_bt.png"
+                alt="Retake"
+                className="block h-full w-full"
+                draggable={false}
+              />
+            </button>
+
+            <button
+              onClick={confirmPhoto}
+              className="absolute left-[55.741%] top-[85.417%] h-[6.771%] w-[36.204%] overflow-hidden rounded-[122px] transition-transform duration-300 hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80"
+              aria-label="Submit photo"
+            >
+              <img
+                src="/sub_bt.png"
+                alt="Submit"
+                className="block h-full w-full"
+                draggable={false}
+              />
+            </button>
+          </>
         )}
-      </div>
+      </main>
     </div>
   );
 };

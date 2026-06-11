@@ -1,5 +1,5 @@
-import React from 'react';
-import { QRCodeSVG as QRCode } from 'qrcode.react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { uploadSharedResultImage } from '../services/supabase';
 
 interface TryOnResultProps {
   userImage: string;
@@ -7,66 +7,405 @@ interface TryOnResultProps {
   resultImage: string;
   isLoading: boolean;
   onStartOver: () => void;
+  onShowQr: (value: string) => void;
 }
+
+const loadImage = (src: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+
+const hasVisiblePixels = (pixels: Uint8ClampedArray) => {
+  let visiblePixels = 0;
+
+  for (let index = 3; index < pixels.length; index += 4) {
+    if (pixels[index] > 10) {
+      visiblePixels += 1;
+    }
+  }
+
+  return visiblePixels / (pixels.length / 4) > 0.02;
+};
+
+const isGreenScreenPixel = (pixels: Uint8ClampedArray, pixelIndex: number) => {
+  const offset = pixelIndex * 4;
+  const red = pixels[offset];
+  const green = pixels[offset + 1];
+  const blue = pixels[offset + 2];
+
+  return green > 80 && green > red * 1.12 && green > blue * 1.12 && green - Math.max(red, blue) > 20;
+};
+
+const isStrongGreenScreenPixel = (pixels: Uint8ClampedArray, pixelIndex: number) => {
+  const offset = pixelIndex * 4;
+  const red = pixels[offset];
+  const green = pixels[offset + 1];
+  const blue = pixels[offset + 2];
+
+  return green > 115 && green > red * 1.3 && green > blue * 1.3 && green - Math.max(red, blue) > 45;
+};
+
+const isLightBackgroundPixel = (pixels: Uint8ClampedArray, pixelIndex: number) => {
+  const offset = pixelIndex * 4;
+  const red = pixels[offset];
+  const green = pixels[offset + 1];
+  const blue = pixels[offset + 2];
+  const maxChannel = Math.max(red, green, blue);
+  const minChannel = Math.min(red, green, blue);
+
+  return minChannel > 178 && maxChannel - minChannel < 58;
+};
+
+const isGeneratedBackgroundPixel = (pixels: Uint8ClampedArray, pixelIndex: number) =>
+  isGreenScreenPixel(pixels, pixelIndex) || isLightBackgroundPixel(pixels, pixelIndex);
+
+const removeGeneratedBackground = (imageData: ImageData) => {
+  const { data: pixels, width, height } = imageData;
+  const pixelCount = width * height;
+  const backgroundMask = new Uint8Array(pixelCount);
+  const queue: number[] = [];
+  let queueIndex = 0;
+
+  const addPixel = (pixelIndex: number) => {
+    if (backgroundMask[pixelIndex] || !isGeneratedBackgroundPixel(pixels, pixelIndex)) return;
+
+    backgroundMask[pixelIndex] = 1;
+    queue.push(pixelIndex);
+  };
+
+  for (let x = 0; x < width; x += 1) {
+    addPixel(x);
+    addPixel((height - 1) * width + x);
+  }
+
+  for (let y = 1; y < height - 1; y += 1) {
+    addPixel(y * width);
+    addPixel(y * width + width - 1);
+  }
+
+  while (queueIndex < queue.length) {
+    const pixelIndex = queue[queueIndex];
+    queueIndex += 1;
+
+    const x = pixelIndex % width;
+    const y = Math.floor(pixelIndex / width);
+
+    if (x > 0) addPixel(pixelIndex - 1);
+    if (x < width - 1) addPixel(pixelIndex + 1);
+    if (y > 0) addPixel(pixelIndex - width);
+    if (y < height - 1) addPixel(pixelIndex + width);
+  }
+
+  const visited = new Uint8Array(pixelCount);
+  const component: number[] = [];
+  const componentQueue: number[] = [];
+  const minFloatingGreenSize = Math.max(18, Math.floor(pixelCount * 0.00003));
+
+  const addComponentPixel = (pixelIndex: number) => {
+    if (
+      visited[pixelIndex] ||
+      backgroundMask[pixelIndex] ||
+      !isStrongGreenScreenPixel(pixels, pixelIndex)
+    ) {
+      return;
+    }
+
+    visited[pixelIndex] = 1;
+    componentQueue.push(pixelIndex);
+    component.push(pixelIndex);
+  };
+
+  for (let startIndex = 0; startIndex < pixelCount; startIndex += 1) {
+    if (visited[startIndex] || backgroundMask[startIndex] || !isStrongGreenScreenPixel(pixels, startIndex)) {
+      continue;
+    }
+
+    component.length = 0;
+    componentQueue.length = 0;
+    let componentQueueIndex = 0;
+    addComponentPixel(startIndex);
+
+    while (componentQueueIndex < componentQueue.length) {
+      const pixelIndex = componentQueue[componentQueueIndex];
+      componentQueueIndex += 1;
+
+      const x = pixelIndex % width;
+      const y = Math.floor(pixelIndex / width);
+
+      for (let yOffset = -1; yOffset <= 1; yOffset += 1) {
+        for (let xOffset = -1; xOffset <= 1; xOffset += 1) {
+          if (xOffset === 0 && yOffset === 0) continue;
+
+          const nextX = x + xOffset;
+          const nextY = y + yOffset;
+
+          if (nextX < 0 || nextX >= width || nextY < 0 || nextY >= height) continue;
+          addComponentPixel(nextY * width + nextX);
+        }
+      }
+    }
+
+    if (component.length >= minFloatingGreenSize) {
+      for (const pixelIndex of component) {
+        backgroundMask[pixelIndex] = 1;
+      }
+    }
+  }
+
+  for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
+    const offset = pixelIndex * 4;
+
+    if (backgroundMask[pixelIndex]) {
+      pixels[offset + 3] = 0;
+      continue;
+    }
+
+    const x = pixelIndex % width;
+    const y = Math.floor(pixelIndex / width);
+    let touchesRemovedBackground = false;
+
+    for (let yOffset = -1; yOffset <= 1 && !touchesRemovedBackground; yOffset += 1) {
+      for (let xOffset = -1; xOffset <= 1; xOffset += 1) {
+        if (xOffset === 0 && yOffset === 0) continue;
+
+        const nextX = x + xOffset;
+        const nextY = y + yOffset;
+
+        if (nextX < 0 || nextX >= width || nextY < 0 || nextY >= height) continue;
+
+        if (backgroundMask[nextY * width + nextX]) {
+          touchesRemovedBackground = true;
+          break;
+        }
+      }
+    }
+
+    if (!touchesRemovedBackground) continue;
+
+    const red = pixels[offset];
+    const green = pixels[offset + 1];
+    const blue = pixels[offset + 2];
+    const strongestNonGreen = Math.max(red, blue);
+    const greenSpill = green - strongestNonGreen;
+
+    if (greenSpill > 8) {
+      pixels[offset + 1] = Math.min(green, strongestNonGreen + 8);
+    }
+
+    if (greenSpill > 22 && green > 70) {
+      const spillStrength = Math.min((greenSpill - 22) / 95, 1);
+      pixels[offset + 3] = Math.round(pixels[offset + 3] * (1 - spillStrength * 0.7));
+    }
+  }
+};
 
 export const TryOnResult: React.FC<TryOnResultProps> = ({
   userImage,
   selectedClothing,
   resultImage,
   isLoading,
-  onStartOver
+  onShowQr
 }) => {
+  const [processedResultImage, setProcessedResultImage] = useState('');
+  const [framedResultImage, setFramedResultImage] = useState('');
+  const [isPreparingQr, setIsPreparingQr] = useState(false);
+
+  const createFramedResultImage = useCallback(async () => {
+    const frame = await loadImage('/frame002.png');
+    const result = await loadImage(processedResultImage || resultImage);
+    const canvas = document.createElement('canvas');
+    canvas.width = frame.naturalWidth;
+    canvas.height = frame.naturalHeight;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Unable to create result image');
+    }
+
+    const resultLeft = canvas.width * 0.11;
+    const resultTop = canvas.height * 0.18;
+    const resultWidth = canvas.width * 0.78;
+    const resultHeight = canvas.height * 0.7;
+    const imageRatio = result.naturalWidth / result.naturalHeight;
+    const targetRatio = resultWidth / resultHeight;
+
+    let drawWidth = resultWidth;
+    let drawHeight = resultHeight;
+    let drawLeft = resultLeft;
+    let drawTop = resultTop;
+
+    if (imageRatio > targetRatio) {
+      drawHeight = resultWidth / imageRatio;
+      drawTop = resultTop + (resultHeight - drawHeight) / 2;
+    } else {
+      drawWidth = resultHeight * imageRatio;
+      drawLeft = resultLeft + (resultWidth - drawWidth) / 2;
+    }
+
+    context.drawImage(frame, 0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#020205';
+    context.fillRect(0, canvas.height * 0.165, canvas.width, canvas.height * 0.745);
+    context.drawImage(result, drawLeft, drawTop, drawWidth, drawHeight);
+
+    return canvas.toDataURL('image/png');
+  }, [processedResultImage, resultImage]);
+
+  const handlePrint = async () => {
+    if (!resultImage || !processedResultImage || isPreparingQr) return;
+
+    window.print();
+    setIsPreparingQr(true);
+
+    try {
+      const framedResultImage = await createFramedResultImage();
+      const sharedResultUrl = await uploadSharedResultImage(framedResultImage);
+      onShowQr(sharedResultUrl);
+    } catch (error) {
+      console.error('Failed to create shared result image:', error);
+      onShowQr(processedResultImage || resultImage);
+    } finally {
+      setIsPreparingQr(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!resultImage) {
+      setProcessedResultImage('');
+      setFramedResultImage('');
+      return;
+    }
+
+    let cancelled = false;
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+
+    image.onload = () => {
+      if (cancelled) return;
+
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+
+        const context = canvas.getContext('2d');
+        if (!context) {
+          setProcessedResultImage(resultImage);
+          return;
+        }
+
+        context.drawImage(image, 0, 0);
+
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = imageData.data;
+
+        removeGeneratedBackground(imageData);
+
+        context.putImageData(imageData, 0, 0);
+        setProcessedResultImage(hasVisiblePixels(pixels) ? canvas.toDataURL('image/png') : resultImage);
+      } catch (error) {
+        console.error('Failed to remove generated green background:', error);
+        setProcessedResultImage(resultImage);
+      }
+    };
+
+    image.onerror = () => {
+      if (!cancelled) {
+        setProcessedResultImage(resultImage);
+      }
+    };
+
+    image.src = resultImage;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resultImage]);
+
+  useEffect(() => {
+    if (!processedResultImage || !resultImage) {
+      setFramedResultImage('');
+      return;
+    }
+
+    let cancelled = false;
+
+    void createFramedResultImage()
+      .then(image => {
+        if (!cancelled) {
+          setFramedResultImage(image);
+        }
+      })
+      .catch(error => {
+        console.error('Failed to create framed result preview:', error);
+        if (!cancelled) {
+          setFramedResultImage('');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [createFramedResultImage, processedResultImage, resultImage]);
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-yellow-400 flex items-center justify-center">
-        <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white/20 text-center max-w-md">
-          <div className="mb-6">
-            <div className="w-16 h-16 mx-auto mb-4 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-            <h2 className="text-2xl font-bold text-black mb-2">Processing ...</h2>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="aspect-square rounded-xl overflow-hidden">
-              <img src={userImage} alt="Original" className="w-full h-full object-cover" />
+      <div className="min-h-screen bg-black flex items-center justify-center overflow-hidden">
+        <main className="relative h-screen max-h-[calc(100vw*16/9)] w-screen max-w-[calc(100vh*9/16)] bg-[url('/bg6.png')] bg-cover bg-center flex items-center justify-center">
+          <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white/20 text-center max-w-md">
+            <div className="mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+              <h2 className="text-2xl font-bold text-white mb-2">Processing ...</h2>
             </div>
-            <div className="aspect-square rounded-xl overflow-hidden">
-              <img src={selectedClothing} alt="Clothing" className="w-full h-full object-cover" />
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="aspect-square rounded-xl overflow-hidden">
+                <img src={userImage} alt="Original" className="w-full h-full object-cover" />
+              </div>
+              <div className="aspect-square rounded-xl overflow-hidden">
+                <img src={selectedClothing} alt="Clothing" className="w-full h-full object-cover" />
+              </div>
             </div>
           </div>
-          
-        </div>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-yellow-400 p-4 flex items-center justify-center">
-      <div className="w-full max-w-4xl text-center">
-        {resultImage ? (
-          <div className=" overflow-hidden">
-            <img src={resultImage} alt="Try-on result" className="w-full h-auto object-cover" />
-          </div>
-        ) : (
-          <div className="w-full aspect-[3/4] flex items-center justify-center rounded-2xl bg-white/10">
-            <div className="w-12 h-12 border-2 border-black/30 border-t-black rounded-full animate-spin"></div>
-          </div>
-        )}
-
-        {resultImage && resultImage.startsWith('http') && (
-          <div className="mt-6">
-            <QRCode value={resultImage} size={128} />
-          </div>
-        )}
-
-        <div className="flex justify-center mt-6 gap-4">
-          <button
-            onClick={onStartOver}
-            className="bg-black hover:bg-gray-800 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all duration-300 hover:scale-105"
-          >
-            Home
-          </button>
+    <div className="min-h-screen bg-black flex items-center justify-center overflow-hidden">
+      <main className="relative h-screen max-h-[calc(100vw*16/9)] w-screen max-w-[calc(100vh*9/16)] bg-[url('/bg6.png')] bg-cover bg-center">
+        <div className="print-target absolute left-1/2 top-[6.5%] z-10 aspect-[750/1200] h-[80%] -translate-x-1/2">
+          <img
+            src={framedResultImage || '/frame002.png'}
+            alt="Try-on result"
+            className="block h-full w-full object-contain"
+            draggable={false}
+          />
         </div>
-      </div>
+
+        {(!resultImage || !framedResultImage) && (
+          <div className="absolute left-1/2 top-[52%] z-20 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+        )}
+
+        <button
+          type="button"
+          onClick={handlePrint}
+          disabled={!resultImage || !processedResultImage || isPreparingQr}
+          className="no-print absolute left-[32.549%] top-[89.389%] z-30 h-[6.771%] w-[36.204%] overflow-hidden rounded-[122px] transition-transform duration-300 hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
+          aria-label="Print result"
+        >
+          <img
+            src="/print_bt.png"
+            alt="Print"
+            className="block h-full w-full"
+            draggable={false}
+          />
+        </button>
+      </main>
     </div>
   );
 };

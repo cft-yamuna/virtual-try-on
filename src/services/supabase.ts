@@ -27,3 +27,26 @@ export const uploadCapturedImage = async (imageData: string): Promise<string> =>
 
   return urlData.publicUrl;
 };
+
+export const uploadSharedResultImage = async (imageData: string): Promise<string> => {
+  const imageResponse = await fetch(imageData);
+  const blob = await imageResponse.blob();
+  const imageName = `shared-results/${Date.now()}.png`;
+
+  const { data, error } = await supabase.storage
+    .from('try-on')
+    .upload(imageName, blob, {
+      contentType: 'image/png',
+      upsert: false
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  const { data: urlData } = supabase.storage
+    .from('try-on')
+    .getPublicUrl(data.path);
+
+  return urlData.publicUrl;
+};
