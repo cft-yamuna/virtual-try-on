@@ -323,7 +323,10 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     const sourceX = resultBounds?.x ?? 0;
     const sourceY = resultBounds?.y ?? 0;
     const sourceWidth = resultBounds?.width ?? result.naturalWidth;
-    const sourceHeight = resultBounds?.height ?? result.naturalHeight;
+    const visibleSourceHeight = resultBounds?.height ?? result.naturalHeight;
+    const sourceHeight = resultBounds
+      ? Math.min(result.naturalHeight - sourceY, Math.round(visibleSourceHeight * 0.72))
+      : result.naturalHeight;
     const targetWidth = Math.min(980, canvas.width);
     const targetHeight = Math.min(1260, canvas.height);
     const targetLeft = (canvas.width - targetWidth) / 2;
