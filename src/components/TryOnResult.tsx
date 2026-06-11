@@ -56,7 +56,7 @@ const drawUserName = (context: CanvasRenderingContext2D, canvasWidth: number, ca
   if (!displayName) return;
 
   const maxWidth = canvasWidth * 0.72;
-  const fontSize = 44;
+  const fontSize = 64;
 
   context.fillStyle = '#ED2024';
   context.textAlign = 'left';
@@ -64,7 +64,7 @@ const drawUserName = (context: CanvasRenderingContext2D, canvasWidth: number, ca
 
   context.font = `800 ${fontSize}px "Helvetica Now Display", Arial, sans-serif`;
 
-  context.fillText(displayName, canvasWidth * 0.05, canvasHeight * 0.955);
+  context.fillText(displayName, canvasWidth * 0.09, canvasHeight * 0.955, maxWidth);
 };
 
 const hasVisiblePixels = (pixels: Uint8ClampedArray) => {
