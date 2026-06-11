@@ -44,15 +44,22 @@ body {
   }
 
   .print-target {
+    display: block !important;
     position: fixed !important;
     left: 50% !important;
     top: 50% !important;
-    width: min(100vw, calc(100vh * 786 / 1248)) !important;
-    height: min(100vh, calc(100vw * 1248 / 786)) !important;
+    width: min(100vw, calc(100vh * 1200 / 1800)) !important;
+    height: min(100vh, calc(100vw * 1800 / 1200)) !important;
     margin: 0 !important;
     transform: translate(-50%, -50%) !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .print-target img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
   }
 
   .no-print {

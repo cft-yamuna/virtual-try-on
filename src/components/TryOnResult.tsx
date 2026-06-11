@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Settings } from 'lucide-react';
 import { uploadSharedResultImage } from '../services/supabase';
 
 interface TryOnResultProps {
@@ -6,6 +7,7 @@ interface TryOnResultProps {
   selectedClothing: string;
   resultImage: string;
   isLoading: boolean;
+  userName: string;
   onStartOver: () => void;
   onShowQr: (value: string) => void;
 }
@@ -18,6 +20,55 @@ const loadImage = (src: string): Promise<HTMLImageElement> =>
     image.onerror = reject;
     image.src = src;
   });
+
+const waitForNextPaint = () =>
+  new Promise<void>(resolve => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+
+const waitForPrintDialog = () =>
+  new Promise<void>(resolve => {
+    let settled = false;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener('afterprint', finish);
+      resolve();
+    };
+
+    window.addEventListener('afterprint', finish);
+    window.print();
+    window.setTimeout(finish, 1000);
+  });
+
+const loadPosterFont = async () => {
+  if (!document.fonts) return;
+
+  await document.fonts.load('800 34px "Helvetica Now Display"');
+};
+
+const drawUserName = (context: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, userName: string) => {
+  const displayName = userName.trim();
+  if (!displayName) return;
+
+  const maxWidth = canvasWidth * 0.62;
+  let fontSize = 34;
+
+  context.fillStyle = '#ED2024';
+  context.textAlign = 'left';
+  context.textBaseline = 'alphabetic';
+
+  do {
+    context.font = `800 ${fontSize}px "Helvetica Now Display", Arial, sans-serif`;
+    if (context.measureText(displayName).width <= maxWidth || fontSize <= 20) break;
+    fontSize -= 2;
+  } while (fontSize > 20);
+
+  context.fillText(displayName, canvasWidth * 0.05, canvasHeight * 0.955);
+};
 
 const hasVisiblePixels = (pixels: Uint8ClampedArray) => {
   let visiblePixels = 0;
@@ -240,14 +291,18 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
   selectedClothing,
   resultImage,
   isLoading,
+  userName,
   onShowQr
 }) => {
   const [processedResultImage, setProcessedResultImage] = useState('');
   const [framedResultImage, setFramedResultImage] = useState('');
   const [isPreparingQr, setIsPreparingQr] = useState(false);
+  const [printMode, setPrintMode] = useState<'front' | 'back'>('front');
 
   const createFramedResultImage = useCallback(async () => {
-    const frame = await loadImage('/frame002.png');
+    await loadPosterFont();
+
+    const frame = await loadImage('/frameog.png');
     const result = await loadImage(processedResultImage || resultImage);
     const canvas = document.createElement('canvas');
     canvas.width = frame.naturalWidth;
@@ -276,7 +331,7 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     const targetWidth = Math.min(933, canvas.width);
     const targetHeight = Math.min(1065, canvas.height);
     const targetLeft = (canvas.width - targetWidth) / 2;
-    const targetTop = canvas.height * 0.18 + (canvas.height * 0.7 - targetHeight) / 2 - canvas.height * 0.055;
+    const targetTop = canvas.height * 0.18 + (canvas.height * 0.7 - targetHeight) / 2 - canvas.height * 0.08;
     const imageRatio = sourceWidth / sourceHeight;
     const targetRatio = targetWidth / targetHeight;
 
@@ -293,9 +348,10 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
       drawLeft = targetLeft + (targetWidth - drawWidth) / 2;
     }
 
-    context.drawImage(frame, 0, 0, canvas.width, canvas.height);
     context.fillStyle = '#020205';
     context.fillRect(0, canvas.height * 0.165, canvas.width, canvas.height * 0.745);
+    context.drawImage(frame, 0, 0, canvas.width, canvas.height);
+
     context.drawImage(
       result,
       sourceX,
@@ -307,23 +363,40 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
       drawWidth,
       drawHeight
     );
+    drawUserName(context, canvas.width, canvas.height, userName);
 
     return canvas.toDataURL('image/png');
-  }, [processedResultImage, resultImage]);
+  }, [processedResultImage, resultImage, userName]);
+
+  const printSelectedSide = useCallback(async (mode: 'front' | 'back') => {
+    setPrintMode(mode);
+    await waitForNextPaint();
+    await waitForPrintDialog();
+    setPrintMode('front');
+  }, []);
 
   const handlePrint = async () => {
-    if (!resultImage || !processedResultImage || isPreparingQr) return;
+    if (!resultImage || !processedResultImage || !framedResultImage || isPreparingQr) return;
 
-    window.print();
+    await printSelectedSide('front');
+  };
+
+  const handlePrintBackAndContinue = async () => {
+    if (!resultImage || !processedResultImage || !framedResultImage || isPreparingQr) return;
+
+    let sharedResultUrl = framedResultImage;
     setIsPreparingQr(true);
 
     try {
-      const framedResultImage = await createFramedResultImage();
-      const sharedResultUrl = await uploadSharedResultImage(framedResultImage);
-      onShowQr(sharedResultUrl);
+      sharedResultUrl = await uploadSharedResultImage(framedResultImage);
     } catch (error) {
       console.error('Failed to create shared result image:', error);
-      onShowQr(processedResultImage || resultImage);
+      sharedResultUrl = processedResultImage || resultImage;
+    }
+
+    try {
+      await printSelectedSide('back');
+      onShowQr(sharedResultUrl);
     } finally {
       setIsPreparingQr(false);
     }
@@ -435,10 +508,19 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
   return (
     <div className="min-h-screen bg-black flex items-center justify-center overflow-hidden">
       <main className="relative h-screen max-h-[calc(100vw*16/9)] w-screen max-w-[calc(100vh*9/16)] bg-[url('/bg6.png')] bg-cover bg-center">
-        <div className="print-target absolute left-1/2 top-[6.5%] z-10 aspect-[750/1200] h-[80%] -translate-x-1/2">
+        <div className={`${printMode === 'front' ? 'print-target ' : ''}absolute left-1/2 top-[6.5%] z-10 aspect-[750/1200] h-[80%] -translate-x-1/2`}>
           <img
-            src={framedResultImage || '/frame002.png'}
+            src={framedResultImage || '/frameog.png'}
             alt="Try-on result"
+            className="block h-full w-full object-contain"
+            draggable={false}
+          />
+        </div>
+
+        <div className={`${printMode === 'back' ? 'print-target ' : ''}hidden`}>
+          <img
+            src="/Back.png"
+            alt="Back print"
             className="block h-full w-full object-contain"
             draggable={false}
           />
@@ -461,6 +543,17 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
             className="block h-full w-full"
             draggable={false}
           />
+        </button>
+
+        <button
+          type="button"
+          onClick={handlePrintBackAndContinue}
+          disabled={!resultImage || !processedResultImage || !framedResultImage || isPreparingQr}
+          className="no-print absolute right-[6%] top-[89.389%] z-30 flex h-[6.771%] aspect-square items-center justify-center rounded-full bg-white text-black shadow-xl transition-transform duration-300 hover:scale-105 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
+          aria-label="Print back and continue"
+          title="Print back and continue"
+        >
+          <Settings className="h-[48%] w-[48%]" strokeWidth={2.5} aria-hidden="true" />
         </button>
       </main>
     </div>

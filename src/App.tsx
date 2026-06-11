@@ -193,6 +193,7 @@ function App() {
           selectedClothing={appState.selectedClothing?.imageUrl || ''}
           resultImage={appState.resultImage || ''}
           isLoading={appState.isLoading}
+          userName={appState.userName}
           onStartOver={handleStartOver}
           onShowQr={handleShowQr}
         />
