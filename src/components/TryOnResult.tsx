@@ -31,6 +31,38 @@ const hasVisiblePixels = (pixels: Uint8ClampedArray) => {
   return visiblePixels / (pixels.length / 4) > 0.02;
 };
 
+const getVisibleBounds = (imageData: ImageData) => {
+  const { data: pixels, width, height } = imageData;
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const alpha = pixels[(y * width + x) * 4 + 3];
+
+      if (alpha <= 20) continue;
+
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+
+  if (maxX < minX || maxY < minY) return null;
+
+  const padding = Math.round(Math.max(width, height) * 0.018);
+
+  return {
+    x: Math.max(0, minX - padding),
+    y: Math.max(0, minY - padding),
+    width: Math.min(width - Math.max(0, minX - padding), maxX - minX + 1 + padding * 2),
+    height: Math.min(height - Math.max(0, minY - padding), maxY - minY + 1 + padding * 2)
+  };
+};
+
 const isGreenScreenPixel = (pixels: Uint8ClampedArray, pixelIndex: number) => {
   const offset = pixelIndex * 4;
   const red = pixels[offset];
@@ -226,30 +258,55 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
       throw new Error('Unable to create result image');
     }
 
-    const resultLeft = canvas.width * 0.11;
-    const resultTop = canvas.height * 0.18;
-    const resultWidth = canvas.width * 0.78;
-    const resultHeight = canvas.height * 0.7;
-    const imageRatio = result.naturalWidth / result.naturalHeight;
-    const targetRatio = resultWidth / resultHeight;
+    const resultCanvas = document.createElement('canvas');
+    resultCanvas.width = result.naturalWidth;
+    resultCanvas.height = result.naturalHeight;
 
-    let drawWidth = resultWidth;
-    let drawHeight = resultHeight;
-    let drawLeft = resultLeft;
-    let drawTop = resultTop;
+    const resultContext = resultCanvas.getContext('2d');
+    resultContext?.drawImage(result, 0, 0);
+
+    const resultBounds = resultContext
+      ? getVisibleBounds(resultContext.getImageData(0, 0, resultCanvas.width, resultCanvas.height))
+      : null;
+
+    const sourceX = resultBounds?.x ?? 0;
+    const sourceY = resultBounds?.y ?? 0;
+    const sourceWidth = resultBounds?.width ?? result.naturalWidth;
+    const sourceHeight = resultBounds?.height ?? result.naturalHeight;
+    const targetWidth = Math.min(933, canvas.width);
+    const targetHeight = Math.min(1065, canvas.height);
+    const targetLeft = (canvas.width - targetWidth) / 2;
+    const targetTop = canvas.height * 0.18 + (canvas.height * 0.7 - targetHeight) / 2;
+    const imageRatio = sourceWidth / sourceHeight;
+    const targetRatio = targetWidth / targetHeight;
+
+    let drawWidth = targetWidth;
+    let drawHeight = targetHeight;
+    let drawLeft = targetLeft;
+    let drawTop = targetTop;
 
     if (imageRatio > targetRatio) {
-      drawHeight = resultWidth / imageRatio;
-      drawTop = resultTop + (resultHeight - drawHeight) / 2;
+      drawHeight = targetWidth / imageRatio;
+      drawTop = targetTop + (targetHeight - drawHeight) / 2;
     } else {
-      drawWidth = resultHeight * imageRatio;
-      drawLeft = resultLeft + (resultWidth - drawWidth) / 2;
+      drawWidth = targetHeight * imageRatio;
+      drawLeft = targetLeft + (targetWidth - drawWidth) / 2;
     }
 
     context.drawImage(frame, 0, 0, canvas.width, canvas.height);
     context.fillStyle = '#020205';
     context.fillRect(0, canvas.height * 0.165, canvas.width, canvas.height * 0.745);
-    context.drawImage(result, drawLeft, drawTop, drawWidth, drawHeight);
+    context.drawImage(
+      result,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      drawLeft,
+      drawTop,
+      drawWidth,
+      drawHeight
+    );
 
     return canvas.toDataURL('image/png');
   }, [processedResultImage, resultImage]);
