@@ -55,17 +55,13 @@ const drawUserName = (context: CanvasRenderingContext2D, canvasWidth: number, ca
   if (!displayName) return;
 
   const maxWidth = canvasWidth * 0.72;
-  let fontSize = 96;
+  const fontSize = 44;
 
   context.fillStyle = '#ED2024';
   context.textAlign = 'left';
   context.textBaseline = 'alphabetic';
 
-  do {
-    context.font = `800 ${fontSize}px "Helvetica Now Display", Arial, sans-serif`;
-    if (context.measureText(displayName).width <= maxWidth || fontSize <= 48) break;
-    fontSize -= 2;
-  } while (fontSize > 48);
+  context.font = `800 ${fontSize}px "Helvetica Now Display", Arial, sans-serif`;
 
   context.fillText(displayName, canvasWidth * 0.05, canvasHeight * 0.955);
 };
@@ -298,7 +294,6 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
   const [framedResultImage, setFramedResultImage] = useState('');
   const [isPreparingQr, setIsPreparingQr] = useState(false);
   const [printMode, setPrintMode] = useState<'front' | 'back'>('front');
-  const [hasPrintedFront, setHasPrintedFront] = useState(false);
 
   const createFramedResultImage = useCallback(async () => {
     await loadPosterFont();
@@ -329,10 +324,10 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     const sourceY = resultBounds?.y ?? 0;
     const sourceWidth = resultBounds?.width ?? result.naturalWidth;
     const sourceHeight = resultBounds?.height ?? result.naturalHeight;
-    const targetWidth = Math.min(933, canvas.width);
-    const targetHeight = Math.min(1065, canvas.height);
+    const targetWidth = Math.min(980, canvas.width);
+    const targetHeight = Math.min(1260, canvas.height);
     const targetLeft = (canvas.width - targetWidth) / 2;
-    const targetTop = canvas.height * 0.18 + (canvas.height * 0.7 - targetHeight) / 2 - canvas.height * 0.08;
+    const targetTop = canvas.height * 0.15;
     const imageRatio = sourceWidth / sourceHeight;
     const targetRatio = targetWidth / targetHeight;
 
@@ -380,7 +375,6 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     if (!resultImage || !processedResultImage || !framedResultImage || isPreparingQr) return;
 
     await printSelectedSide('front');
-    setHasPrintedFront(true);
   };
 
   const handleNext = async () => {
@@ -424,11 +418,8 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     if (!resultImage) {
       setProcessedResultImage('');
       setFramedResultImage('');
-      setHasPrintedFront(false);
       return;
     }
-
-    setHasPrintedFront(false);
 
     let cancelled = false;
     const image = new Image();
@@ -485,7 +476,9 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     let cancelled = false;
 
     void createFramedResultImage()
-      .then(image => {
+      .then(async image => {
+        await loadImage(image);
+
         if (!cancelled) {
           setFramedResultImage(image);
         }
@@ -502,7 +495,7 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     };
   }, [createFramedResultImage, processedResultImage, resultImage]);
 
-  if (isLoading) {
+  if (isLoading || Boolean(resultImage && !framedResultImage)) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center overflow-hidden">
         <main className="relative h-screen max-h-[calc(100vw*16/9)] w-screen max-w-[calc(100vh*9/16)] bg-[url('/bg6.png')] bg-cover bg-center flex items-center justify-center">
@@ -529,7 +522,7 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
   return (
     <div className="min-h-screen bg-black flex items-center justify-center overflow-hidden">
       <main className="relative h-screen max-h-[calc(100vw*16/9)] w-screen max-w-[calc(100vh*9/16)] bg-[url('/bg6.png')] bg-cover bg-center">
-        <div className={`${printMode === 'front' ? 'print-target ' : ''}absolute left-1/2 top-[6.5%] z-10 aspect-[750/1200] h-[80%] -translate-x-1/2`}>
+        <div className={`${printMode === 'front' ? 'print-target ' : ''}absolute left-1/2 top-[23%] z-10 aspect-[750/1200] h-[62%] -translate-x-1/2`}>
           <img
             src={framedResultImage || '/frameog.png'}
             alt="Try-on result"
@@ -547,31 +540,29 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
           />
         </div>
 
-        {(!resultImage || !framedResultImage) && (
-          <div className="absolute left-1/2 top-[52%] z-20 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-        )}
+        <button
+          type="button"
+          onClick={handlePrint}
+          disabled={!resultImage || !processedResultImage || !framedResultImage || isPreparingQr}
+          className="no-print absolute left-[14%] top-[89.389%] z-30 h-[6.771%] w-[33%] overflow-hidden rounded-[122px] transition-transform duration-300 hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
+          aria-label="Print result"
+        >
+          <img
+            src="/print_bt.png"
+            alt="Print"
+            className="block h-full w-full"
+            draggable={false}
+          />
+        </button>
 
         <button
           type="button"
-          onClick={hasPrintedFront ? handleNext : handlePrint}
+          onClick={handleNext}
           disabled={!resultImage || !processedResultImage || !framedResultImage || isPreparingQr}
-          className={`no-print absolute left-[32.549%] top-[89.389%] z-30 h-[6.771%] w-[36.204%] overflow-hidden rounded-[122px] transition-transform duration-300 hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100 ${
-            hasPrintedFront
-              ? "bg-[#ffd914] text-black font-['Helvetica_Now_Display'] text-[clamp(20px,4vh,54px)] font-extrabold leading-none"
-              : ''
-          }`}
-          aria-label={hasPrintedFront ? 'Next' : 'Print result'}
+          className="no-print absolute right-[14%] top-[89.389%] z-30 h-[6.771%] w-[33%] overflow-hidden rounded-[122px] bg-[#ffd914] text-black font-['Helvetica_Now_Display'] text-[clamp(20px,4vh,54px)] font-extrabold leading-none transition-transform duration-300 hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
+          aria-label="Next"
         >
-          {hasPrintedFront ? (
-            <span className="flex h-full w-full items-center justify-center">NEXT</span>
-          ) : (
-            <img
-              src="/print_bt.png"
-              alt="Print"
-              className="block h-full w-full"
-              draggable={false}
-            />
-          )}
+          <span className="flex h-full w-full items-center justify-center">NEXT</span>
         </button>
 
         <button
