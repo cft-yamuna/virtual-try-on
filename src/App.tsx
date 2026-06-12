@@ -25,7 +25,7 @@ const jerseyGeneration = {
     j2: {
       id: 'try-on-j2',
       name: 'Blue Jersey',
-      imageUrl: '/male2.jpg',
+      imageUrl: '/male2.png',
       category: 'Jersey'
     }
   },
@@ -39,7 +39,7 @@ const jerseyGeneration = {
     j2: {
       id: 'try-on-female-j2',
       name: 'Female Jersey 2',
-      imageUrl: '/female2.jpg',
+      imageUrl: '/female2.png',
       category: 'Jersey'
     }
   }
