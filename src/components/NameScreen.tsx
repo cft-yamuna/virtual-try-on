@@ -5,8 +5,7 @@ interface NameScreenProps {
 }
 
 const formatName = (value: string) => {
-  const lowerCaseValue = value.toLowerCase();
-  return lowerCaseValue.charAt(0).toUpperCase() + lowerCaseValue.slice(1);
+  return value.toUpperCase();
 };
 
 export const NameScreen: React.FC<NameScreenProps> = ({ onContinue }) => {
@@ -29,6 +28,7 @@ export const NameScreen: React.FC<NameScreenProps> = ({ onContinue }) => {
             onChange={event => setName(formatName(event.target.value))}
             placeholder="Enter Your Name / Nickname"
             aria-label="Enter your name"
+            autoCapitalize="characters"
             className="absolute left-[11.271%] top-[38.768%] h-[7.372%] w-[77.479%] rounded-[18px] border-0 bg-white px-[5.2%] font-['Helvetica_Now_Display'] text-[clamp(24px,4vh,52px)] font-extrabold leading-none text-[#1f1f1f] shadow-none outline-none placeholder:text-[#858585] focus:ring-4 focus:ring-white/40"
           />
 
