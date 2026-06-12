@@ -16,7 +16,7 @@ interface TryOnResultProps {
 const OUTPUT_IMAGE_WIDTH = 756;
 const OUTPUT_IMAGE_HEIGHT = 1200;
 const RESULT_BACKDROP_IMAGE = '/backdrop.png';
-const FOREGROUND_SCALE = 1.2;
+const FOREGROUND_SCALE = 1;
 const FOREGROUND_OFFSET_Y = -0.07;
 const PRINT_PAGE_WIDTH_MM = 53.98;
 const PRINT_PAGE_HEIGHT_MM = 85.72;

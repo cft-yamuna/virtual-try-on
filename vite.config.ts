@@ -21,6 +21,9 @@ const sendJson = (response: ServerResponse, statusCode: number, payload: unknown
   response.end(JSON.stringify(payload));
 };
 
+const isClippingMagicTestMode = (env: Record<string, string>) =>
+  env.CLIPPING_MAGIC_TEST?.trim().toLowerCase() !== 'false';
+
 const clippingMagicBackgroundRemovalPlugin = (env: Record<string, string>): Plugin => ({
   name: 'clippingmagic-background-removal',
   configureServer(server) {
@@ -53,7 +56,9 @@ const clippingMagicBackgroundRemovalPlugin = (env: Record<string, string>): Plug
         formData.append('image.url', imageUrl);
         formData.append('format', 'result');
 
-        if (env.CLIPPING_MAGIC_TEST?.toLowerCase() === 'true') {
+        const testMode = isClippingMagicTestMode(env);
+
+        if (testMode) {
           formData.append('test', 'true');
         }
 
@@ -61,7 +66,7 @@ const clippingMagicBackgroundRemovalPlugin = (env: Record<string, string>): Plug
           url: 'https://clippingmagic.com/api/v1/images',
           imageUrl,
           format: 'result',
-          test: env.CLIPPING_MAGIC_TEST?.toLowerCase() === 'true'
+          test: testMode
         });
 
         const clippingResponse = await fetch('https://clippingmagic.com/api/v1/images', {

@@ -19,13 +19,13 @@ const jerseyGeneration = {
     j1: {
       id: 'try-on-j1',
       name: 'Jersey 1',
-      imageUrl: '/male1.jpg',
+      imageUrl: '/mt1.png',
       category: 'Jersey'
     },
     j2: {
       id: 'try-on-j2',
       name: 'Blue Jersey',
-      imageUrl: '/male2.png',
+      imageUrl: '/mt2.png',
       category: 'Jersey'
     }
   },
@@ -33,13 +33,13 @@ const jerseyGeneration = {
     j1: {
       id: 'try-on-female-j1',
       name: 'Female Jersey 1',
-      imageUrl: '/female1.png',
+      imageUrl: '/ft1.png',
       category: 'Jersey'
     },
     j2: {
       id: 'try-on-female-j2',
       name: 'Female Jersey 2',
-      imageUrl: '/female2.png',
+      imageUrl: '/ft2.png',
       category: 'Jersey'
     }
   }
@@ -48,7 +48,7 @@ const jerseyGeneration = {
 const fallbackGeneration = {
   id: 'try-on-j1',
   name: 'Jersey 1',
-  imageUrl: '/male1.jpg',
+  imageUrl: '/mt1.png',
   category: 'Jersey'
 };
 
