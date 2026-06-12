@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Settings } from 'lucide-react';
-import { removeBackground, type Config as BackgroundRemovalConfig } from '@imgly/background-removal';
+import { removeImageBackground } from '../services/backgroundRemoval';
 import { uploadSharedResultImage } from '../services/supabase';
 
 interface TryOnResultProps {
@@ -16,24 +16,11 @@ interface TryOnResultProps {
 const OUTPUT_IMAGE_WIDTH = 756;
 const OUTPUT_IMAGE_HEIGHT = 1200;
 const RESULT_BACKDROP_IMAGE = '/backdrop.png';
+const FOREGROUND_SCALE = 1.2;
+const FOREGROUND_OFFSET_Y = -0.07;
 const PRINT_PAGE_WIDTH_MM = 53.98;
 const PRINT_PAGE_HEIGHT_MM = 85.72;
 const PRINT_BLEED_MM = 2.4;
-const BACKGROUND_REMOVAL_CONFIG: BackgroundRemovalConfig = {
-  model: 'isnet_quint8',
-  output: {
-    format: 'image/png',
-    quality: 1,
-    type: 'foreground'
-  },
-  progress: (key, current, total) => {
-    console.info('[TryOnResult] Background removal asset progress.', {
-      key,
-      current,
-      total
-    });
-  }
-};
 
 const loadImage = (src: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
@@ -166,11 +153,17 @@ const drawImageContain = (
   context: CanvasRenderingContext2D,
   image: HTMLImageElement,
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
+  scale = 1,
+  offsetY = 0
 ) => {
   const rect = getContainRect(image, canvasWidth, canvasHeight);
+  const scaledWidth = rect.width * scale;
+  const scaledHeight = rect.height * scale;
+  const scaledX = rect.x + (rect.width - scaledWidth) / 2;
+  const scaledY = rect.y + (rect.height - scaledHeight) / 2 + canvasHeight * offsetY;
 
-  context.drawImage(image, rect.x, rect.y, rect.width, rect.height);
+  context.drawImage(image, scaledX, scaledY, scaledWidth, scaledHeight);
 };
 
 const drawImageCover = (
@@ -191,7 +184,7 @@ const drawImageCover = (
 
 const removePersonBackground = async (imageSource: string) => {
   console.info('[TryOnResult] Removing YouCam output background.');
-  const foregroundBlob = await removeBackground(imageSource, BACKGROUND_REMOVAL_CONFIG);
+  const foregroundBlob = await removeImageBackground(imageSource);
   const foregroundUrl = URL.createObjectURL(foregroundBlob);
 
   try {
@@ -256,8 +249,11 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
 
     drawImageCover(context, backdrop, canvas.width, canvas.height);
 
-    console.info('[TryOnResult] Compositing transparent YouCam output over backdrop.');
-    drawImageContain(context, generatedPerson, canvas.width, canvas.height);
+    console.info('[TryOnResult] Compositing transparent YouCam output over backdrop.', {
+      foregroundScale: FOREGROUND_SCALE,
+      foregroundOffsetY: FOREGROUND_OFFSET_Y
+    });
+    drawImageContain(context, generatedPerson, canvas.width, canvas.height, FOREGROUND_SCALE, FOREGROUND_OFFSET_Y);
 
     drawUserName(context, canvas.width, canvas.height, userName);
 
