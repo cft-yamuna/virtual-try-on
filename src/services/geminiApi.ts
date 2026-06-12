@@ -12,6 +12,9 @@ export interface TryOnRequest {
 
 const GEMINI_MODEL = 'gemini-3.1-flash-image';
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const NO_VISIBLE_AI_BRANDING_PROMPT = `
+VISIBLE BRANDING / WATERMARK RULE:
+Do not add any Gemini logo, Google logo, AI logo, watermark, signature, badge, icon, stamp, label, caption, QR code, corner mark, metadata text, or generated-by branding anywhere in the output image. The final image must contain only the person, the selected jersey, and the requested background/framing. If any reference or generation artifact contains Gemini, Google, AI branding, or a watermark, remove it completely.`;
 
 // No changes needed for this helper function, it looks good.
 const convertImageToBase64 = async (imageSource: string): Promise<{ mimeType: string; data: string }> => {
@@ -196,7 +199,7 @@ Negative Prompt:
 Do not synthesize a new face. Do not approximate or average the user's identity. Do not beautify, smooth, slim, or idealize the face. Do not add facial hair not present in Image 1. Do not change hairstyle, hair length, hair color, hair texture, hairline, hair volume, hair parting, forehead coverage, or flyaways. Do not paste the whole head from Image 1. Do not copy the Image 1 head as a cutout layer. Do not include Image 1 background edges, lighting, neck patch, or shoulder patch. Do not alter the target body, clothing, pose, or accessories. Do not change jersey colors, numbers, logos, badges, collar, sleeves, stripes, patterns, or typography. Do not recolor or redesign the jersey. Do not use any background color other than exactly #00FF00. Do not add shadows, gradients, or noise to the background. Do not include any background except flat solid #00FF00. Do not use the original lighting from Image 1 on the swapped face. Do not leave mismatched color temperature between face and body. Do not produce flat-lit face on a dramatically lit body or vice versa. Do not leave visible brightness difference between the face and neck. Do not produce a pasted-on look, mismatched skin tone, wrong hairline, warped eyes, distorted nose, blurry face, bad neck anatomy, floating head, extra faces, or visible compositing seams.`;
 
     const contentParts = [
-      { text: prompt },
+      { text: `${prompt}\n${NO_VISIBLE_AI_BRANDING_PROMPT}` },
       { inlineData: { mimeType: userImageBlob.mimeType, data: userImageBlob.data } },
       { inlineData: { mimeType: clothingImageBlob.mimeType, data: clothingImageBlob.data } }
     ];

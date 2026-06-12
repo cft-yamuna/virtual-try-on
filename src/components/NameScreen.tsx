@@ -5,8 +5,7 @@ interface NameScreenProps {
 }
 
 const formatName = (value: string) => {
-  const lowerCaseValue = value.toLowerCase();
-  return lowerCaseValue.charAt(0).toUpperCase() + lowerCaseValue.slice(1);
+  return value.toUpperCase();
 };
 
 export const NameScreen: React.FC<NameScreenProps> = ({ onContinue }) => {
