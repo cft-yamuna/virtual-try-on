@@ -56,9 +56,9 @@ const drawUserName = (context: CanvasRenderingContext2D, canvasWidth: number, ca
   if (!displayName) return;
 
   const maxWidth = canvasWidth * 0.72;
-  const fontSize = 64;
-  const paddingX = 38;
-  const paddingY = 22;
+  const fontSize = 40;
+  const paddingX = 26;
+  const paddingY = 14;
   const textLeft = canvasWidth * 0.075;
   const textCenterY = canvasHeight * 0.943;
 
