@@ -6,7 +6,7 @@ import { JerseyScreen } from './components/JerseyScreen';
 import { CameraCapture } from './components/CameraCapture';
 import { TryOnResult } from './components/TryOnResult';
 import { QrScreen } from './components/QrScreen';
-import { generateVirtualTryOn } from './services/geminiApi';
+import { generateVirtualTryOn } from './services/youcamApi';
 import {
   createTryOnSession,
   updateTryOnSessionSharedResult,
@@ -99,6 +99,12 @@ function App() {
     const selectedJersey = appState.selectedJersey || 'j1';
     const selectedClothing = jerseyGeneration[selectedGender]?.[selectedJersey] || fallbackGeneration;
 
+    console.info('[TryOn] Camera image captured. Preparing generation.', {
+      selectedGender,
+      selectedJersey,
+      selectedClothing: selectedClothing.imageUrl
+    });
+
     setAppState(prev => ({
       ...prev,
       currentStep: 'result',
@@ -111,18 +117,28 @@ function App() {
     }));
 
     const capturedImageUpload = uploadCapturedImage(imageData)
-      .then(publicUrl => publicUrl)
+      .then(publicUrl => {
+        console.info('[TryOn] Captured camera image uploaded.', { publicUrl });
+        return publicUrl;
+      })
       .catch((error): null => {
         console.error('Failed to upload captured image:', error);
         return null;
       });
 
     try {
+      const capturedImageUrl = await capturedImageUpload;
+      console.info('[TryOn] Starting YouCam generation.', {
+        cameraInput: capturedImageUrl ? 'uploaded-url' : 'captured-data-url-fallback',
+        clothingInput: selectedClothing.imageUrl
+      });
+
       const resultImage = await generateVirtualTryOn({
-        userImage: imageData,
+        userImage: capturedImageUrl || imageData,
         clothingImage: selectedClothing.imageUrl
       });
-      const capturedImageUrl = await capturedImageUpload;
+
+      console.info('[TryOn] YouCam generation finished.', { resultImage });
 
       const tryOnSessionId = await createTryOnSession({
         userName: appState.userName,
@@ -134,6 +150,8 @@ function App() {
         console.error('Failed to save try-on session:', error);
         return null;
       });
+
+      console.info('[TryOn] Session save completed.', { tryOnSessionId });
 
       setAppState(prev => ({
         ...prev,
@@ -203,7 +221,6 @@ function App() {
       return (
         <TryOnResult
           userImage={appState.userImage!}
-          selectedClothing={appState.selectedClothing?.imageUrl || ''}
           resultImage={appState.resultImage || ''}
           isLoading={appState.isLoading}
           userName={appState.userName}

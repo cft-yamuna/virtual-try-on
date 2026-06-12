@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Settings } from 'lucide-react';
+import { removeBackground, type Config as BackgroundRemovalConfig } from '@imgly/background-removal';
 import { uploadSharedResultImage } from '../services/supabase';
 
 interface TryOnResultProps {
   userImage: string;
-  selectedClothing: string;
   resultImage: string;
   isLoading: boolean;
   userName: string;
@@ -15,74 +15,24 @@ interface TryOnResultProps {
 
 const OUTPUT_IMAGE_WIDTH = 756;
 const OUTPUT_IMAGE_HEIGHT = 1200;
+const RESULT_BACKDROP_IMAGE = '/backdrop.png';
 const PRINT_PAGE_WIDTH_MM = 53.98;
 const PRINT_PAGE_HEIGHT_MM = 85.72;
 const PRINT_BLEED_MM = 2.4;
-
-type FaceMask = {
-  centerX: number;
-  centerY: number;
-  radiusX: number;
-  radiusY: number;
-  neckTopY: number;
-  neckBottomY: number;
-  neckTopWidth: number;
-  neckBottomWidth: number;
-  sourceScale?: number;
-  sourceOffsetX?: number;
-  sourceOffsetY?: number;
-};
-
-const faceMasksByBaseImage: Record<string, FaceMask> = {
-  'female1.png': {
-    centerX: 0.502,
-    centerY: 0.278,
-    radiusX: 0.16,
-    radiusY: 0.18,
-    neckTopY: 0.365,
-    neckBottomY: 0.47,
-    neckTopWidth: 0.15,
-    neckBottomWidth: 0.24
+const BACKGROUND_REMOVAL_CONFIG: BackgroundRemovalConfig = {
+  model: 'isnet_quint8',
+  output: {
+    format: 'image/png',
+    quality: 1,
+    type: 'foreground'
   },
-  'female2.png': {
-    centerX: 0.503,
-    centerY: 0.278,
-    radiusX: 0.162,
-    radiusY: 0.18,
-    neckTopY: 0.365,
-    neckBottomY: 0.46,
-    neckTopWidth: 0.15,
-    neckBottomWidth: 0.24
-  },
-  'male1.jpg': {
-    centerX: 0.502,
-    centerY: 0.306,
-    radiusX: 0.205,
-    radiusY: 0.205,
-    neckTopY: 0.405,
-    neckBottomY: 0.505,
-    neckTopWidth: 0.18,
-    neckBottomWidth: 0.31,
-    sourceScale: 0.985,
-    sourceOffsetY: -0.004
-  },
-  'male2.png': {
-    centerX: 0.502,
-    centerY: 0.272,
-    radiusX: 0.198,
-    radiusY: 0.19,
-    neckTopY: 0.365,
-    neckBottomY: 0.5,
-    neckTopWidth: 0.18,
-    neckBottomWidth: 0.31,
-    sourceScale: 0.985,
-    sourceOffsetY: -0.004
+  progress: (key, current, total) => {
+    console.info('[TryOnResult] Background removal asset progress.', {
+      key,
+      current,
+      total
+    });
   }
-};
-
-const getBaseImageName = (src: string) => {
-  const cleanSrc = src.split('?')[0].split('#')[0];
-  return cleanSrc.substring(cleanSrc.lastIndexOf('/') + 1);
 };
 
 const loadImage = (src: string): Promise<HTMLImageElement> =>
@@ -194,32 +144,40 @@ const loadPosterFont = async () => {
   await document.fonts.load('800 34px "Helvetica Now Display"');
 };
 
-const drawImageContain = (
-  context: CanvasRenderingContext2D,
+const getContainRect = (
   image: HTMLImageElement,
   canvasWidth: number,
   canvasHeight: number
 ) => {
   const imageRatio = image.naturalWidth / image.naturalHeight;
   const canvasRatio = canvasWidth / canvasHeight;
-  const drawWidth = imageRatio > canvasRatio ? canvasWidth : canvasHeight * imageRatio;
-  const drawHeight = imageRatio > canvasRatio ? canvasWidth / imageRatio : canvasHeight;
-  const drawX = (canvasWidth - drawWidth) / 2;
-  const drawY = (canvasHeight - drawHeight) / 2;
+  const width = imageRatio > canvasRatio ? canvasWidth : canvasHeight * imageRatio;
+  const height = imageRatio > canvasRatio ? canvasWidth / imageRatio : canvasHeight;
 
-  context.fillStyle = '#000000';
-  context.fillRect(0, 0, canvasWidth, canvasHeight);
-  context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+  return {
+    x: (canvasWidth - width) / 2,
+    y: (canvasHeight - height) / 2,
+    width,
+    height
+  };
+};
+
+const drawImageContain = (
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  canvasWidth: number,
+  canvasHeight: number
+) => {
+  const rect = getContainRect(image, canvasWidth, canvasHeight);
+
+  context.drawImage(image, rect.x, rect.y, rect.width, rect.height);
 };
 
 const drawImageCover = (
   context: CanvasRenderingContext2D,
   image: HTMLImageElement,
   canvasWidth: number,
-  canvasHeight: number,
-  scale = 1,
-  offsetX = 0,
-  offsetY = 0
+  canvasHeight: number
 ) => {
   const imageRatio = image.naturalWidth / image.naturalHeight;
   const canvasRatio = canvasWidth / canvasHeight;
@@ -227,87 +185,20 @@ const drawImageCover = (
   const sourceHeight = imageRatio > canvasRatio ? image.naturalHeight : image.naturalWidth / canvasRatio;
   const sourceX = (image.naturalWidth - sourceWidth) / 2;
   const sourceY = (image.naturalHeight - sourceHeight) / 2;
-  const drawWidth = canvasWidth * scale;
-  const drawHeight = canvasHeight * scale;
-  const drawX = (canvasWidth - drawWidth) / 2 + offsetX * canvasWidth;
-  const drawY = (canvasHeight - drawHeight) / 2 + offsetY * canvasHeight;
 
-  context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, drawX, drawY, drawWidth, drawHeight);
+  context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvasWidth, canvasHeight);
 };
 
-const drawFacePatch = (
-  context: CanvasRenderingContext2D,
-  generatedImage: HTMLImageElement,
-  baseImageSource: string,
-  canvasWidth: number,
-  canvasHeight: number
-) => {
-  const mask = faceMasksByBaseImage[getBaseImageName(baseImageSource)];
-  if (!mask) {
-    drawImageContain(context, generatedImage, canvasWidth, canvasHeight);
-    return;
+const removePersonBackground = async (imageSource: string) => {
+  console.info('[TryOnResult] Removing YouCam output background.');
+  const foregroundBlob = await removeBackground(imageSource, BACKGROUND_REMOVAL_CONFIG);
+  const foregroundUrl = URL.createObjectURL(foregroundBlob);
+
+  try {
+    return await loadImage(foregroundUrl);
+  } finally {
+    URL.revokeObjectURL(foregroundUrl);
   }
-
-  const faceLayer = document.createElement('canvas');
-  faceLayer.width = canvasWidth;
-  faceLayer.height = canvasHeight;
-
-  const faceContext = faceLayer.getContext('2d');
-  if (!faceContext) return;
-
-  drawImageCover(
-    faceContext,
-    generatedImage,
-    canvasWidth,
-    canvasHeight,
-    mask.sourceScale,
-    mask.sourceOffsetX,
-    mask.sourceOffsetY
-  );
-  const maskLayer = document.createElement('canvas');
-  maskLayer.width = canvasWidth;
-  maskLayer.height = canvasHeight;
-
-  const maskContext = maskLayer.getContext('2d');
-  if (!maskContext) return;
-
-  const centerX = mask.centerX * canvasWidth;
-  const centerY = mask.centerY * canvasHeight;
-  const radiusX = mask.radiusX * canvasWidth;
-  const radiusY = mask.radiusY * canvasHeight;
-
-  const gradient = maskContext.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(radiusX, radiusY));
-  gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
-  gradient.addColorStop(0.86, 'rgba(0, 0, 0, 1)');
-  gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-  maskContext.fillStyle = gradient;
-  maskContext.beginPath();
-  maskContext.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-  maskContext.fill();
-
-  const neckTopY = mask.neckTopY * canvasHeight;
-  const neckBottomY = mask.neckBottomY * canvasHeight;
-  const neckTopHalfWidth = (mask.neckTopWidth * canvasWidth) / 2;
-  const neckBottomHalfWidth = (mask.neckBottomWidth * canvasWidth) / 2;
-  const neckFeather = Math.max(canvasWidth, canvasHeight) * 0.006;
-
-  maskContext.filter = `blur(${neckFeather}px)`;
-  maskContext.fillStyle = 'rgba(0, 0, 0, 1)';
-  maskContext.beginPath();
-  maskContext.moveTo(centerX - neckTopHalfWidth, neckTopY);
-  maskContext.lineTo(centerX + neckTopHalfWidth, neckTopY);
-  maskContext.lineTo(centerX + neckBottomHalfWidth, neckBottomY);
-  maskContext.lineTo(centerX - neckBottomHalfWidth, neckBottomY);
-  maskContext.closePath();
-  maskContext.fill();
-  maskContext.filter = 'none';
-
-  faceContext.globalCompositeOperation = 'destination-in';
-  faceContext.drawImage(maskLayer, 0, 0);
-  faceContext.filter = 'none';
-
-  context.drawImage(faceLayer, 0, 0);
 };
 
 const drawUserName = (context: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, userName: string) => {
@@ -339,7 +230,6 @@ const drawUserName = (context: CanvasRenderingContext2D, canvasWidth: number, ca
 };
 
 export const TryOnResult: React.FC<TryOnResultProps> = ({
-  selectedClothing,
   resultImage,
   isLoading,
   userName,
@@ -351,30 +241,28 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
   const createNamedResultImage = useCallback(async () => {
     await loadPosterFont();
 
-    const [base, result] = await Promise.all([
-      selectedClothing ? loadImage(selectedClothing) : null,
-      loadImage(resultImage)
+    const [backdrop, generatedPerson] = await Promise.all([
+      loadImage(RESULT_BACKDROP_IMAGE),
+      removePersonBackground(resultImage)
     ]);
     const canvas = document.createElement('canvas');
-    canvas.width = base?.naturalWidth || OUTPUT_IMAGE_WIDTH;
-    canvas.height = base?.naturalHeight || OUTPUT_IMAGE_HEIGHT;
+    canvas.width = OUTPUT_IMAGE_WIDTH;
+    canvas.height = OUTPUT_IMAGE_HEIGHT;
 
     const context = canvas.getContext('2d');
     if (!context) {
       throw new Error('Unable to create result image');
     }
 
-    if (base) {
-      context.drawImage(base, 0, 0, canvas.width, canvas.height);
-      drawFacePatch(context, result, selectedClothing, canvas.width, canvas.height);
-    } else {
-      drawImageContain(context, result, canvas.width, canvas.height);
-    }
+    drawImageCover(context, backdrop, canvas.width, canvas.height);
+
+    console.info('[TryOnResult] Compositing transparent YouCam output over backdrop.');
+    drawImageContain(context, generatedPerson, canvas.width, canvas.height);
 
     drawUserName(context, canvas.width, canvas.height, userName);
 
     return canvas.toDataURL('image/png');
-  }, [resultImage, selectedClothing, userName]);
+  }, [resultImage, userName]);
 
   const printSelectedSide = useCallback((imageSrc: string) => printSingleImage(imageSrc), []);
 
