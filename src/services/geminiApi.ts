@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI, Modality } from '@google/genai';
 import { supabase } from './supabase'; // Make sure this path is correct
 
 export interface TryOnRequest {
@@ -14,7 +14,7 @@ type GeminiResponsePart = {
   };
 };
 
-const GEMINI_MODEL = 'gemini-3.1-flash-image';
+const GEMINI_MODEL = 'gemini-3-pro-image';
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 // No changes needed for this helper function, it looks good.
@@ -98,6 +98,46 @@ const uploadGeneratedImage = async (generatedImageBase64: string): Promise<strin
   }
 };
 
+const generateImageWithPrompt = async (
+  ai: GoogleGenAI,
+  prompt: string,
+  userImageBlob: { mimeType: string; data: string },
+  clothingImageBlob: { mimeType: string; data: string }
+): Promise<{ image: { mimeType: string; data: string } | null; text: string }> => {
+  const response = await ai.models.generateContentStream({
+    model: GEMINI_MODEL,
+    config: {
+      responseModalities: [Modality.IMAGE, Modality.TEXT]
+    },
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: userImageBlob.mimeType, data: userImageBlob.data } },
+          { inlineData: { mimeType: clothingImageBlob.mimeType, data: clothingImageBlob.data } }
+        ]
+      }
+    ]
+  });
+
+  const textParts: string[] = [];
+
+  for await (const chunk of response) {
+    const image = findGeneratedImage(chunk);
+    if (image) {
+      return { image, text: textParts.join('\n').trim() };
+    }
+
+    const text = getResponseText(chunk) || chunk.text;
+    if (text) {
+      textParts.push(text);
+    }
+  }
+
+  return { image: null, text: textParts.join('\n').trim() };
+};
+
 
 export const generateVirtualTryOn = async (request: TryOnRequest): Promise<string> => {
   try {
@@ -105,8 +145,9 @@ export const generateVirtualTryOn = async (request: TryOnRequest): Promise<strin
       throw new Error('Missing VITE_GEMINI_API_KEY environment variable');
     }
 
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+    const ai = new GoogleGenAI({
+      apiKey: GEMINI_API_KEY
+    });
 
     const userImageBlob = await convertImageToBase64(request.userImage);
     const clothingImageBlob = await convertImageToBase64(request.clothingImage);
@@ -148,20 +189,10 @@ NO EXTRA MARKS - Preserve the full Image 2 frame exactly. Do not add any new mar
 Negative Prompt:
 Do not synthesize a new face. Do not approximate or average the user's identity. Do not change the user's facial structure, face shape, bone structure, jawline, chin, cheeks, cheekbones, forehead, temples, eye spacing, eye shape, nose shape, nose width, nostrils, mouth width, lip shape, facial proportions, neck tone, throat shape, natural asymmetry, skin marks, or expression. Do not beautify, smooth, slim, widen, sharpen, soften, age, de-age, idealize, stylize, cartoon, retouch, or reinterpret the face or visible neck. Do not add facial hair not present in Image 1. Do not change hairstyle, hair length, hair color, hair texture, hairline, hair volume, hair parting, forehead coverage, or flyaways. Do not paste the whole head from Image 1. Do not copy the Image 1 shoulders, background, or clothing as a cutout layer. Do not leave the original target neck visible under the swapped face. Do not create a different-color neck, dark neck under light face, light neck under dark face, two-tone skin, neck seam, chin seam, jaw seam, collar seam, or mismatched face-to-neck transition. Do not enlarge the user's face or head. Do not make the face bigger than the target face in Image 2. Do not create an oversized head, bobblehead look, swollen forehead, wide jaw, tiny neck, tiny shoulders, or mismatched head-to-body proportions. Do not make the head look copied from a different image. Do not leave the face or neck brighter, darker, warmer, cooler, sharper, blurrier, smoother, noisier, flatter, or more contrasty than the body and jersey. Do not create a hard face edge, halo, mask outline, mismatched beard edge, mismatched hair edge, mismatched neck color, or pasted-on look. Do not include Image 1 background edges, lighting, shoulder patch, or clothing patch. Do not alter the target body, clothing, pose, or accessories except for replacing the visible neck skin down to the jersey collar. Do not change jersey colors, numbers, logos, badges, collar, sleeves, stripes, patterns, sponsor text, fabric texture, folds, wrinkles, fit, placement, shadows, or typography. Do not recolor, redesign, regenerate, clean up, sharpen, blur, crop, warp, simplify, or reinterpret the jersey. Do not replace the jersey with a similar jersey. Do not use a green screen. Do not create a flat green, transparent, cutout, removed, white, gray, or newly generated background. Do not alter the Image 2 poster layout, black background, smoke, header graphics, footer graphics, crop, or canvas size. Do not add a new sparkle icon, star-shaped icon, four-point shine icon, model/provider/app branding, watermark, signature, stamp, attribution, generated-by label, service mark, QR code, barcode, or any new branding/text/graphic mark that is not already present in Image 2. Do not add fake neon glow, fantasy light, harsh lens flare, overexposed shine, plastic skin, waxy skin, beauty-filter smoothing, blown highlights, graphic light streaks, or artificial lighting overlays. Do not use the original lighting from Image 1 on the swapped face or neck. Do not leave mismatched color temperature between face, neck, and body. Do not produce flat-lit face on a dramatically lit body or vice versa. Do not leave visible brightness difference between the face and neck. Do not produce a pasted-on look, mismatched skin tone, wrong hairline, warped eyes, distorted nose, blurry face, bad neck anatomy, floating head, extra faces, or visible compositing seams.`;
 
-    const contentParts = [
-      { text: prompt },
-      { inlineData: { mimeType: userImageBlob.mimeType, data: userImageBlob.data } },
-      { inlineData: { mimeType: clothingImageBlob.mimeType, data: clothingImageBlob.data } }
-    ];
+    const response = await generateImageWithPrompt(ai, prompt, userImageBlob, clothingImageBlob);
+    console.log('Response text:', response.text);
 
-    const result = await model.generateContent(contentParts);
-
-    const response = await result.response;
-    console.log('Full response:', JSON.stringify(response, null, 2));
-    console.log('Candidates:', response.candidates);
-    console.log('Response text:', getResponseText(response));
-
-    let generatedImage = findGeneratedImage(response);
+    let generatedImage = response.image;
 
     if (!generatedImage) {
       const retryPrompt = `Return one edited image only.
@@ -172,19 +203,13 @@ Keep the user's face structure unchanged: same face shape, jaw, chin, cheeks, no
 
 Preserve Image 2's jersey, pose, background, crop, logos, sponsor text, fabric, collar, sleeves, colors, shadows, and poster layout exactly. Add realistic DSLR studio lighting with natural shine, eye catchlights, fabric sheen, and clean glow. No new sparkle icon, star-shaped icon, four-point shine icon, model/provider/app branding, watermark, signature, text label, QR code, barcode, fake neon glow, harsh lens flare, plastic skin, or beauty-filter smoothing.`;
 
-      const retryResult = await model.generateContent([
-        { text: retryPrompt },
-        { inlineData: { mimeType: userImageBlob.mimeType, data: userImageBlob.data } },
-        { inlineData: { mimeType: clothingImageBlob.mimeType, data: clothingImageBlob.data } }
-      ]);
-      const retryResponse = await retryResult.response;
-      console.log('Retry response:', JSON.stringify(retryResponse, null, 2));
-      console.log('Retry response text:', getResponseText(retryResponse));
-      generatedImage = findGeneratedImage(retryResponse);
+      const retryResponse = await generateImageWithPrompt(ai, retryPrompt, userImageBlob, clothingImageBlob);
+      console.log('Retry response text:', retryResponse.text);
+      generatedImage = retryResponse.image;
     }
 
     if (!generatedImage) {
-      throw new Error(`No image was generated by the AI model. Response text: ${getResponseText(response) || 'No text returned'}`);
+      throw new Error(`No image was generated by the AI model. Response text: ${response.text || 'No text returned'}`);
     }
 
     const generatedImageBase64 = `data:${generatedImage.mimeType};base64,${generatedImage.data}`;
