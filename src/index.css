@@ -114,24 +114,29 @@ body {
 
 @media print {
   @page {
-    size: 756px 1200px;
+    size: 53.98mm 85.72mm;
     margin: 0;
   }
 
   html,
+  #root,
   body {
-    width: 756px;
-    height: 1200px;
+    width: 53.98mm;
+    height: 85.72mm;
+    min-height: 85.72mm;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
     background: #000;
   }
 
   body * {
-    visibility: hidden !important;
+    display: none !important;
   }
 
   .print-target,
   .print-target * {
-    visibility: visible !important;
+    display: block !important;
   }
 
   .print-target {
@@ -140,17 +145,25 @@ body {
     inset: 0 !important;
     left: 0 !important;
     top: 0 !important;
-    width: 756px !important;
-    height: 1200px !important;
+    width: 53.98mm !important;
+    height: 85.72mm !important;
     margin: 0 !important;
+    padding: 0 !important;
     transform: none !important;
+    overflow: hidden !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
   .print-target img {
-    width: 100% !important;
-    height: 100% !important;
+    position: fixed !important;
+    left: -0.84mm !important;
+    top: -0.84mm !important;
+    width: calc(100% + 2.4mm) !important;
+    height: calc(100% + 2.4mm) !important;
+    background: #000 !important;
     object-fit: cover !important;
   }
 

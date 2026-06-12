@@ -15,6 +15,9 @@ interface TryOnResultProps {
 
 const OUTPUT_IMAGE_WIDTH = 756;
 const OUTPUT_IMAGE_HEIGHT = 1200;
+const PRINT_PAGE_WIDTH_MM = 53.98;
+const PRINT_PAGE_HEIGHT_MM = 85.72;
+const PRINT_BLEED_MM = 2.4;
 
 type FaceMask = {
   centerX: number;
@@ -34,22 +37,22 @@ const faceMasksByBaseImage: Record<string, FaceMask> = {
   'female1.png': {
     centerX: 0.502,
     centerY: 0.278,
-    radiusX: 0.19,
+    radiusX: 0.16,
     radiusY: 0.18,
     neckTopY: 0.365,
-    neckBottomY: 0.455,
-    neckTopWidth: 0.155,
-    neckBottomWidth: 0.205
+    neckBottomY: 0.47,
+    neckTopWidth: 0.15,
+    neckBottomWidth: 0.24
   },
   'female2.png': {
     centerX: 0.503,
     centerY: 0.278,
-    radiusX: 0.192,
+    radiusX: 0.162,
     radiusY: 0.18,
     neckTopY: 0.365,
-    neckBottomY: 0.448,
-    neckTopWidth: 0.155,
-    neckBottomWidth: 0.21
+    neckBottomY: 0.46,
+    neckTopWidth: 0.15,
+    neckBottomWidth: 0.24
   },
   'male1.jpg': {
     centerX: 0.502,
@@ -57,9 +60,9 @@ const faceMasksByBaseImage: Record<string, FaceMask> = {
     radiusX: 0.205,
     radiusY: 0.205,
     neckTopY: 0.405,
-    neckBottomY: 0.482,
-    neckTopWidth: 0.145,
-    neckBottomWidth: 0.19,
+    neckBottomY: 0.505,
+    neckTopWidth: 0.18,
+    neckBottomWidth: 0.31,
     sourceScale: 0.985,
     sourceOffsetY: -0.004
   },
@@ -69,9 +72,9 @@ const faceMasksByBaseImage: Record<string, FaceMask> = {
     radiusX: 0.198,
     radiusY: 0.19,
     neckTopY: 0.365,
-    neckBottomY: 0.472,
-    neckTopWidth: 0.145,
-    neckBottomWidth: 0.19,
+    neckBottomY: 0.5,
+    neckTopWidth: 0.18,
+    neckBottomWidth: 0.31,
     sourceScale: 0.985,
     sourceOffsetY: -0.004
   }
@@ -91,28 +94,99 @@ const loadImage = (src: string): Promise<HTMLImageElement> =>
     image.src = src;
   });
 
-const waitForNextPaint = () =>
-  new Promise<void>(resolve => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => resolve());
-    });
-  });
-
-const waitForPrintDialog = () =>
+const waitForPrintDialog = (printFrame: HTMLIFrameElement) =>
   new Promise<void>(resolve => {
     let settled = false;
 
     const finish = () => {
       if (settled) return;
       settled = true;
-      window.removeEventListener('afterprint', finish);
+      printFrame.contentWindow?.removeEventListener('afterprint', finish);
+      printFrame.remove();
       resolve();
     };
 
-    window.addEventListener('afterprint', finish);
-    window.print();
+    printFrame.contentWindow?.addEventListener('afterprint', finish);
+    printFrame.contentWindow?.focus();
+    printFrame.contentWindow?.print();
     window.setTimeout(finish, 1000);
   });
+
+const printSingleImage = async (imageSrc: string) => {
+  const printFrame = document.createElement('iframe');
+  printFrame.title = 'Print image';
+  printFrame.style.position = 'fixed';
+  printFrame.style.left = '-9999px';
+  printFrame.style.top = '0';
+  printFrame.style.width = '1px';
+  printFrame.style.height = '1px';
+  printFrame.style.border = '0';
+  printFrame.style.opacity = '0';
+
+  document.body.appendChild(printFrame);
+
+  const printDocument = printFrame.contentDocument;
+  if (!printDocument) {
+    printFrame.remove();
+    throw new Error('Unable to create print frame');
+  }
+
+  printDocument.open();
+  printDocument.write(`<!doctype html>
+    <html>
+      <head>
+        <style>
+          @page {
+            size: ${PRINT_PAGE_WIDTH_MM}mm ${PRINT_PAGE_HEIGHT_MM}mm;
+            margin: 0;
+          }
+
+          html,
+          body {
+            width: ${PRINT_PAGE_WIDTH_MM}mm;
+            height: ${PRINT_PAGE_HEIGHT_MM}mm;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+          }
+
+          img {
+            display: block;
+            position: fixed;
+            left: -${PRINT_BLEED_MM * 0.35}mm;
+            top: -${PRINT_BLEED_MM * 0.35}mm;
+            width: ${PRINT_PAGE_WIDTH_MM + PRINT_BLEED_MM}mm;
+            height: ${PRINT_PAGE_HEIGHT_MM + PRINT_BLEED_MM}mm;
+            background: #000;
+            object-fit: cover;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+        </style>
+      </head>
+      <body>
+        <img id="print-output" alt="Print output" />
+      </body>
+    </html>`);
+  printDocument.close();
+
+  const image = printDocument.querySelector<HTMLImageElement>('#print-output');
+  if (image) {
+    image.src = imageSrc;
+  }
+
+  if (image && !image.complete) {
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error('Unable to load print image'));
+    });
+  }
+
+  await waitForPrintDialog(printFrame);
+};
 
 const loadPosterFont = async () => {
   if (!document.fonts) return;
@@ -274,8 +348,6 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
 }) => {
   const [framedResultImage, setFramedResultImage] = useState('');
   const [isPreparingQr, setIsPreparingQr] = useState(false);
-  const [printMode, setPrintMode] = useState<'front' | 'back'>('front');
-
   const createNamedResultImage = useCallback(async () => {
     await loadPosterFont();
 
@@ -304,17 +376,12 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     return canvas.toDataURL('image/png');
   }, [resultImage, selectedClothing, userName]);
 
-  const printSelectedSide = useCallback(async (mode: 'front' | 'back') => {
-    setPrintMode(mode);
-    await waitForNextPaint();
-    await waitForPrintDialog();
-    setPrintMode('front');
-  }, []);
+  const printSelectedSide = useCallback((imageSrc: string) => printSingleImage(imageSrc), []);
 
   const handlePrint = async () => {
     if (!resultImage || !framedResultImage || isPreparingQr) return;
 
-    await printSelectedSide('front');
+    await printSelectedSide(framedResultImage);
   };
 
   const handleNext = async () => {
@@ -349,7 +416,7 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     }
 
     try {
-      await printSelectedSide('back');
+      await printSelectedSide('/Back.png');
       onShowQr(sharedResultUrl);
     } finally {
       setIsPreparingQr(false);
@@ -412,7 +479,7 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
   return (
     <div className="min-h-screen bg-black flex items-center justify-center overflow-hidden">
       <main className="relative h-screen max-h-[calc(100vw*16/9)] w-screen max-w-[calc(100vh*9/16)] bg-[url('/bg6.png')] bg-cover bg-center">
-        <div className={`${printMode === 'front' ? 'print-target ' : ''}absolute left-1/2 top-[23%] z-10 aspect-[756/1200] h-[62%] -translate-x-1/2`}>
+        <div className="absolute left-1/2 top-[23%] z-10 aspect-[756/1200] h-[62%] -translate-x-1/2">
           <img
             src={framedResultImage || resultImage}
             alt="Try-on result"
@@ -421,7 +488,7 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
           />
         </div>
 
-        <div className={`${printMode === 'back' ? 'print-target ' : ''}hidden`}>
+        <div className="hidden">
           <img
             src="/Back.png"
             alt="Back print"
