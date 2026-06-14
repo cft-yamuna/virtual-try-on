@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Download, Settings } from 'lucide-react';
 import { removeBackground, type Config as BackgroundRemovalConfig } from '@imgly/background-removal';
 import { uploadSharedResultImage } from '../services/supabase';
+import { buildResultDownloadFileName, downloadImageFile } from '../utils/downloadImage';
 
 interface TryOnResultProps {
   userImage: string;
@@ -272,6 +273,12 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
     await printSelectedSide(framedResultImage);
   };
 
+  const handleDownload = () => {
+    if (!resultImage || !framedResultImage || isPreparingQr) return;
+
+    downloadImageFile(framedResultImage, buildResultDownloadFileName(userName));
+  };
+
   const handleNext = async () => {
     if (!resultImage || !framedResultImage || isPreparingQr) return;
 
@@ -384,6 +391,17 @@ export const TryOnResult: React.FC<TryOnResultProps> = ({
             draggable={false}
           />
         </div>
+
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={!resultImage || !framedResultImage || isPreparingQr}
+          className="no-print absolute right-[7%] top-[23.5%] z-30 flex h-[5.2%] aspect-square items-center justify-center rounded-full bg-white text-black shadow-[0_8px_28px_rgba(0,0,0,0.35)] transition-transform duration-300 hover:scale-[1.06] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
+          aria-label="Download result image"
+          title="Download result image"
+        >
+          <Download className="h-[48%] w-[48%]" strokeWidth={2.8} aria-hidden="true" />
+        </button>
 
         <button
           type="button"
